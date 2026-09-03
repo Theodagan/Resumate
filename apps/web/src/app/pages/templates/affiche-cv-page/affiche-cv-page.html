@@ -1,0 +1,261 @@
+@if (isLoading()) {
+  <main class="affiche-cv-page affiche-cv-page--state">
+    <p>Chargement du CV...</p>
+  </main>
+} @else if (errorMessage()) {
+  <main class="affiche-cv-page affiche-cv-page--state">
+    <h1>Impossible de charger le CV</h1>
+    <p>{{ errorMessage() }}</p>
+  </main>
+} @else if (cvData(); as data) {
+  <main class="affiche-cv-page">
+    <!-- ================= FEUILLE 1 — RECTO ================================= -->
+    <div class="page">
+      <section class="sheet" aria-label="Recto : profil, parcours, projets">
+        <div class="trame" aria-hidden="true"></div>
+
+        <section class="panel hero">
+          <div class="section-head">
+            <p class="eyebrow">Profil</p><span class="count">01 / 06</span>
+          </div>
+
+          <h1 class="display">{{ getDisplayName(data) }}</h1>
+          @if (getRole(data)) {
+            <p class="role">{{ getRole(data) }}</p>
+          }
+
+          <p class="status">{{ getStatus(data) }}</p>
+
+          @if (getIntro(data); as intro) {
+            <p class="intro">{{ intro }}</p>
+          }
+
+          @if (getSkillChips(data.skills); as skillChips) {
+            @if (skillChips.length > 0) {
+              <h2 class="panel-head">Compétences</h2>
+              <ul class="chips">
+                @for (skill of skillChips; track skill.id) {
+                  <li>{{ skill.name }}</li>
+                }
+              </ul>
+            }
+          }
+
+          @if (data.degrees.length > 0) {
+            <h2 class="panel-head">Formation</h2>
+            <ul class="edu-list">
+              @for (degree of data.degrees; track degree.id) {
+                <li>
+                  <span class="edu-year">{{ degree.year }}</span>
+                  <span>
+                    <strong>{{ degree.title }}</strong>
+                    @if (degree.school) {
+                      <span class="edu-school">{{ degree.school }}</span>
+                    }
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+
+          @if (getLanguages(data.skills); as languages) {
+            <p class="languages">{{ languages }}</p>
+          }
+
+          <div class="contact-block">
+            <h2 class="panel-head">Coordonnées</h2>
+            <div class="contact">
+              <ul class="links">
+                @if (data.user?.email; as email) {
+                  <li>
+                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.6" y="3.6" width="12.8" height="8.8"/><path d="M1.6 4.4 8 9l6.4-4.6"/></svg>
+                    <a [href]="'mailto:' + email">{{ email }}</a>
+                  </li>
+                }
+                @if (data.user?.github; as github) {
+                  <li>
+                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 4 2 8l3.6 4M10.4 4 14 8l-3.6 4"/></svg>
+                    <a [href]="github" target="_blank" rel="noreferrer">{{ stripUrlProtocol(github) }}</a>
+                  </li>
+                }
+                @if (data.user?.linkedin; as linkedin) {
+                  <li>
+                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.6" y="2.6" width="12.8" height="10.8"/><circle cx="5.6" cy="6.9" r="1.5"/><path d="M3 12.2c.5-1.5 1.5-2.3 2.6-2.3s2.1.8 2.6 2.3M10 6.6h3M10 9.2h3"/></svg>
+                    <a [href]="linkedin" target="_blank" rel="noreferrer">{{ stripUrlProtocol(linkedin) }}</a>
+                  </li>
+                }
+                @if (data.user?.website; as website) {
+                  <li>
+                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c3 3.4 3 8.9 0 12.4M8 1.8c-3 3.4-3 8.9 0 12.4"/></svg>
+                    <a [href]="website" target="_blank" rel="noreferrer">{{ stripUrlProtocol(website) }}</a>
+                  </li>
+                }
+              </ul>
+              @if (qrCodeUrl(); as qrCode) {
+                <figure class="qr">
+                  <img [src]="qrCode" alt="QR code vers le profil en ligne">
+                  <figcaption>Profil</figcaption>
+                </figure>
+              }
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <p class="eyebrow">Parcours</p><span class="count">02 / 06</span>
+          </div>
+
+          @if (getSortedJobs(data.jobs); as jobs) {
+            <div class="timeline">
+              @for (job of jobs; track job.id) {
+                <article class="timeline-item job">
+                  <p class="job-date">{{ getJobDateRange(job) }}</p>
+                  <h3>{{ job.position }}</h3>
+                  <p class="company">{{ job.company }}</p>
+                  @if (stripHtml(job.responsibilities); as responsibilities) {
+                    <p class="job-text">{{ responsibilities }}</p>
+                  }
+                </article>
+              }
+            </div>
+          }
+
+          @if (getFreelanceMissions(data.jobs); as missions) {
+            @if (missions.length > 0) {
+              <h2 class="panel-head">En parallèle — missions freelance</h2>
+              <ul class="missions">
+                @for (mission of missions; track mission.id) {
+                  <li><b>{{ mission.year }}</b><span>{{ mission.label }}</span></li>
+                }
+              </ul>
+            }
+          }
+        </section>
+
+        <section class="panel">
+          <div class="section-head">
+            <p class="eyebrow">Projets</p><span class="count">03 / 06</span>
+          </div>
+
+          @if (getHeroProject(data.projects); as heroProject) {
+            <article class="project-hero">
+              <p class="project-match-label">Projet mis en avant</p>
+              @if (getProjectImage(heroProject); as heroImage) {
+                @if (heroProject.url) {
+                  <a class="project-preview" [href]="heroProject.url" target="_blank" rel="noreferrer" [attr.aria-label]="'Voir le projet ' + heroProject.name">
+                    <img [src]="heroImage" alt="">
+                  </a>
+                } @else {
+                  <span class="project-preview"><img [src]="heroImage" alt=""></span>
+                }
+              }
+              <h3>{{ heroProject.name }}</h3>
+              @if (getProjectMeta(heroProject); as heroMeta) {
+                <p class="project-meta">{{ heroMeta }}</p>
+              }
+              @if (stripHtml(heroProject.description); as heroDescription) {
+                <p class="project-text">{{ heroDescription }}</p>
+              }
+              @if (heroProject.url) {
+                <ul class="project-urls">
+                  <li><a [href]="heroProject.url" target="_blank" rel="noreferrer">{{ stripUrlProtocol(heroProject.url) }}</a></li>
+                </ul>
+              }
+            </article>
+          }
+
+          @for (project of getProjectRows(data.projects); track project.id; let index = $index) {
+            <article class="project-row">
+              <span class="project-index" aria-hidden="true">{{ getProjectIndex(index) }}</span>
+              <div>
+                <h3>{{ project.name }}</h3>
+                @if (getProjectMeta(project); as projectMeta) {
+                  <p class="project-meta">{{ projectMeta }}</p>
+                }
+                @if (stripHtml(project.description); as projectDescription) {
+                  <p class="project-text">{{ projectDescription }}</p>
+                }
+                @if (project.url) {
+                  <ul class="project-urls">
+                    <li><a [href]="project.url" target="_blank" rel="noreferrer">{{ stripUrlProtocol(project.url) }}</a></li>
+                  </ul>
+                }
+              </div>
+            </article>
+          }
+        </section>
+      </section>
+    </div>
+
+    <!-- ================= FEUILLE 2 — VERSO ================================= -->
+    <div class="page">
+      <section class="sheet" aria-label="Verso : univers graphique et pourquoi moi">
+        <div class="trame" aria-hidden="true"></div>
+
+        <section class="panel universe">
+          <div class="section-head">
+            <p class="eyebrow">Univers</p><span class="count">04–05 / 06</span>
+          </div>
+
+          <p class="universe-intro">
+            Un aperçu de ma manière de composer des produits numériques : hiérarchie nette, couleur
+            fonctionnelle et détails graphiques qui restent au service de l'usage.
+          </p>
+
+          @if (getGalleryItems(data.projects); as galleryItems) {
+            @if (galleryItems.length > 0) {
+              <div class="universe-gallery">
+                @for (item of galleryItems; track item.id; let first = $first) {
+                  <figure class="universe-item" [class.universe-item--featured]="first" [class.universe-item--product]="!first">
+                    <div class="universe-media"><img [src]="item.imageUrl" [alt]="item.title"></div>
+                    <figcaption>
+                      <strong>{{ item.title }}</strong>
+                      @if (item.caption) {
+                        <span>{{ item.caption }}</span>
+                      }
+                    </figcaption>
+                  </figure>
+                }
+              </div>
+            }
+          }
+        </section>
+
+        <section class="panel fit">
+          <div class="section-head">
+            <p class="eyebrow">Pourquoi moi</p><span class="count">06 / 06</span>
+          </div>
+
+          <h2 class="fit-lead">{{ getFitLead(data) }}</h2>
+
+          @if (data.achievements.length > 0) {
+            <div class="fit-body">
+              @for (achievement of data.achievements; track achievement.id; let index = $index) {
+                <article class="fit-block">
+                  <span class="mark" aria-hidden="true">{{ getMark(index) }}</span>
+                  <div>
+                    <h3>{{ achievement.title }}</h3>
+                    @if (stripHtml(achievement.description); as achievementDescription) {
+                      <p>{{ achievementDescription }}</p>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          }
+
+          @if (data.user?.email; as ctaEmail) {
+            <div class="cta">
+              <div>
+                <strong>Parlons du poste.</strong>
+                <span class="mail">{{ ctaEmail }}</span>
+              </div>
+              <a class="btn-primary" [href]="'mailto:' + ctaEmail">Écrire</a>
+            </div>
+          }
+        </section>
+      </section>
+    </div>
+  </main>
+}

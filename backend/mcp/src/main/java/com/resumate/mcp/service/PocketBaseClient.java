@@ -60,7 +60,8 @@ public class PocketBaseClient {
                             new ExtraFieldDescriptor("compactMode", "Compact mode", "boolean", false, "Whether the template should aggressively reduce spacing to fit more content on one A4 page.", null, List.of())
                     )
             ),
-            new TemplateDescriptor("minimal", "Minimal", "Harvard-style single-column resume with inline contact details, restrained typography, and compact sections.", List.of())
+            new TemplateDescriptor("minimal", "Minimal", "Harvard-style single-column resume with inline contact details, restrained typography, and compact sections.", List.of()),
+            new TemplateDescriptor("affiche", "Affiche", "Two-page A4 landscape poster CV with a three-panel recto (profile, experience, projects) and a verso (visual universe, fit arguments), built on the Affiche design system.", List.of())
     );
 
     private final PocketBaseProperties properties;

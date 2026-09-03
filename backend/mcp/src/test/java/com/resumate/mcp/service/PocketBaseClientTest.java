@@ -65,16 +65,17 @@ class PocketBaseClientTest {
     void resolveAvailableTemplates_returnsAllTemplates() {
         List<TemplateDescriptor> result = client.resolveAvailableTemplates();
 
-        assertThat(result).hasSize(5);
+        assertThat(result).hasSize(6);
         assertThat(result.stream().map(TemplateDescriptor::id).toList())
-                .containsExactly("classic", "bento", "modern", "supa", "minimal");
+                .containsExactly("classic", "bento", "modern", "supa", "minimal", "affiche");
         assertThat(result.stream().map(TemplateDescriptor::description).toList())
                 .containsExactly(
                         "Two-column CV with grouped experience, a dedicated contact panel, and categorized skills.",
                         "Visual grid-based resume with strong project and profile presentation.",
                         "Split-sidebar resume with timeline-style experience and card-based project highlights.",
                         "Clean, compact, print-first CV designed to fit into a single A4 page. Dynamic sizing, great for showcasing lots of projects.",
-                        "Harvard-style single-column resume with inline contact details, restrained typography, and compact sections."
+                        "Harvard-style single-column resume with inline contact details, restrained typography, and compact sections.",
+                        "Two-page A4 landscape poster CV with a three-panel recto (profile, experience, projects) and a verso (visual universe, fit arguments), built on the Affiche design system."
                 );
         assertThat(result.get(2).extraSchema()).extracting(PocketBaseClient.ExtraFieldDescriptor::id)
                 .containsExactly("headline", "accentColor");

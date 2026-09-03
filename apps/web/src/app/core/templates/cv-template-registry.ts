@@ -1,4 +1,5 @@
 import { Type } from '@angular/core';
+import { AfficheCvPage } from '../../pages/templates/affiche-cv-page/affiche-cv-page';
 import { ClassicCvPage } from '../../pages/templates/classic-cv-page/classic-cv-page';
 import { BentoCvPage } from '../../pages/templates/bento-cv-page/bento-cv-page';
 import { MinimalCvPage } from '../../pages/templates/minimal-cv-page/minimal-cv-page';
@@ -78,6 +79,7 @@ export const CV_TEMPLATE_OPTIONS: CvTemplateOption[] = [
     ],
   },
   { id: 'minimal', label: 'Minimal', component: MinimalCvPage },
+  { id: 'affiche', label: 'Affiche', component: AfficheCvPage },
 ];
 
 export const CV_TEMPLATE_OPTIONS_BY_ID = new Map(CV_TEMPLATE_OPTIONS.map((template) => [template.id, template]));
