@@ -2,7 +2,7 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
 HELPERS := scripts/make_helpers.sh
-SEED_USER_EMAIL := alexandre.cv@gmail.com
+SEED_USER_EMAIL := alexandre.exemple@example.com
 COMPOSE := docker compose --env-file .env -f docker/docker-compose.yml
 COMPOSE_DEV := docker compose --env-file .env -f docker/docker-compose.dev.yml
 
