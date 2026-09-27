@@ -1,3 +1,76 @@
+// Privileged users fields may only be changed by superusers. The users update rule
+// lets owners edit their own record, so without this guard any user could PATCH
+// isMcpServiceAccount=true and match every service-account clause in the API rules.
+// Handlers run in isolated JSVM contexts, so the field list is declared inline.
+onRecordCreateRequest((e) => {
+  if (e.hasSuperuserAuth()) {
+    return e.next();
+  }
+
+  const record = e.record;
+  if (!record) {
+    throw new BadRequestError('User record is missing.');
+  }
+
+  const collection = record.collection();
+  for (const fieldName of ['isMcpServiceAccount', 'bypassBilling', 'subscriptionStatus', 'stripeCustomerId', 'stripeSubscriptionId']) {
+    if (!collection.fields.getByName(fieldName)) continue;
+
+    const value = record.get(fieldName);
+    if (value !== null && value !== undefined && value !== false && value !== '') {
+      throw new ForbiddenError('You cannot set this field.');
+    }
+  }
+
+  return e.next();
+}, 'users');
+
+onRecordUpdateRequest((e) => {
+  if (e.hasSuperuserAuth()) {
+    return e.next();
+  }
+
+  const record = e.record;
+  if (!record) {
+    throw new BadRequestError('User record is missing.');
+  }
+
+  const original = record.original();
+  const collection = record.collection();
+  for (const fieldName of ['isMcpServiceAccount', 'bypassBilling', 'subscriptionStatus', 'stripeCustomerId', 'stripeSubscriptionId']) {
+    if (!collection.fields.getByName(fieldName)) continue;
+
+    if (record.getString(fieldName) !== original.getString(fieldName)) {
+      throw new ForbiddenError('You cannot change this field.');
+    }
+  }
+
+  return e.next();
+}, 'users');
+
+// Owned material records must never be handed to another user on update. The
+// update rules only check the stored owner, not @request.body.user.
+onRecordUpdateRequest((e) => {
+  if (!e.auth) {
+    throw new UnauthorizedError('Authentication required.');
+  }
+
+  if (e.hasSuperuserAuth()) {
+    return e.next();
+  }
+
+  const record = e.record;
+  if (!record) {
+    throw new BadRequestError('Record is missing.');
+  }
+
+  if (record.getString('user') !== record.original().getString('user')) {
+    throw new ForbiddenError('You cannot change the owner of this record.');
+  }
+
+  return e.next();
+}, 'jobs', 'skills', 'projects', 'achievements', 'degrees', 'hobbies', 'files', 'skill_categories');
+
 onRecordCreateRequest((e) => {
   try {
     if (!e.auth) {
@@ -64,11 +137,16 @@ onRecordUpdateRequest((e) => {
     throw new BadRequestError('CV profile record is missing.');
   }
 
-  const currentOwnerId = record.getString('user');
+  // e.record already carries the request body; the stored owner lives on original().
+  const currentOwnerId = record.original().getString('user');
   const isMcpServiceAccount = e.auth.getBool('isMcpServiceAccount');
 
   if (!hasSuperuserAccess && !isMcpServiceAccount && currentOwnerId && currentOwnerId !== e.auth.id) {
     throw new ForbiddenError('You cannot edit another user\'s CV profile.');
+  }
+
+  if (!hasSuperuserAccess && isMcpServiceAccount && record.getString('user') !== currentOwnerId) {
+    throw new ForbiddenError('You cannot change the owner of a CV profile.');
   }
 
   if (!hasSuperuserAccess && !isMcpServiceAccount) {
@@ -113,6 +191,7 @@ onRecordCreateRequest((e) => {
   }
 
   record.set('user', e.auth.id);
+  record.set('status', 'active');
   record.set('lastUsedAt', null);
   return e.next();
 }, 'ai_tokens');
@@ -127,16 +206,31 @@ onRecordUpdateRequest((e) => {
     throw new BadRequestError('API key record is missing.');
   }
 
-  const currentOwnerId = record.getString('user');
+  if (e.hasSuperuserAuth()) {
+    return e.next();
+  }
+
+  // e.record already carries the request body; the stored values live on original().
+  const original = record.original();
+  const currentOwnerId = original.getString('user');
   const isMcpServiceAccount = e.auth.getBool('isMcpServiceAccount');
 
-  if (!e.hasSuperuserAuth() && !isMcpServiceAccount && currentOwnerId && currentOwnerId !== e.auth.id) {
+  if (!isMcpServiceAccount && currentOwnerId && currentOwnerId !== e.auth.id) {
     throw new ForbiddenError('You cannot edit another user\'s API key.');
   }
 
-  if (!e.hasSuperuserAuth() && !isMcpServiceAccount) {
-    record.set('user', e.auth.id);
+  // Key material, ownership and expiry are fixed at creation, and revocation is
+  // final: a stolen session must not be able to re-enable a revoked key.
+  for (const fieldName of ['user', 'token_hash', 'token_prefix', 'expiresAt']) {
+    if (record.getString(fieldName) !== original.getString(fieldName)) {
+      throw new ForbiddenError('You cannot change this API key field.');
+    }
   }
+
+  if (original.getString('status') === 'revoked' && record.getString('status') !== 'revoked') {
+    throw new ForbiddenError('A revoked API key cannot be re-activated.');
+  }
+
   return e.next();
 }, 'ai_tokens');
 
@@ -249,14 +343,14 @@ const revokeAiTokenHandler = (e) => {
     $app.save(record);
   } catch (saveError) {
     console.error('[ai-tokens] Revoke save failed:', saveError?.message || saveError);
-    throw new BadRequestError('Failed to revoke API key: ' + (saveError?.message || 'unknown error'));
+    throw new BadRequestError('Failed to revoke API key.');
   }
 
   const saved = $app.findRecordById('ai_tokens', id);
   const savedStatus = saved.getString('status');
   if (savedStatus !== 'revoked') {
     console.error('[ai-tokens] Revoke verification failed: status=' + savedStatus);
-    throw new BadRequestError('Revoke did not persist. Current status: ' + savedStatus);
+    throw new BadRequestError('Failed to revoke API key.');
   }
 
   console.log('[ai-tokens] API key revoked successfully:', id);

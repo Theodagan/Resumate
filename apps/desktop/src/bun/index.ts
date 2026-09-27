@@ -395,11 +395,18 @@ async function createLocalPocketBaseUser(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
+    // Explicit allowlist: this request runs with a superuser token, so spreading the
+    // caller's body would let it set privileged fields such as isMcpServiceAccount.
     body: JSON.stringify({
-      ...body,
       firstName,
       lastName,
       email,
+      password,
+      passwordConfirm,
+      phone: body.phone,
+      linkedin: body.linkedin,
+      github: body.github,
+      website: body.website,
       verified: true,
       emailVisibility: true,
     }),

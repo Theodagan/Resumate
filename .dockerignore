@@ -14,3 +14,8 @@ backend/pocketbase/pb_data/*
 # Local/generated files
 .git/
 .DS_Store
+
+# Secrets never belong in a build context
+.env
+.env.*
+!.env.example

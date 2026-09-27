@@ -390,8 +390,9 @@ export class ProfileEditorPage implements OnInit, OnDestroy {
       .replace(/^(["“”])(<[a-z][\s\S]*>)/i, '$2')
       .replace(/(<\/[a-z]+>)(["“”])$/i, '$1');
 
-    const container = document.createElement('div');
-    container.innerHTML = html;
+    // DOMParser yields an inert document: unlike innerHTML on a live-document node,
+    // it never loads <img> sources or fires inline handlers from untrusted HTML.
+    const container = new DOMParser().parseFromString(html, 'text/html').body;
     const hasMediaOrStructure = !!container.querySelector('img,video,iframe,ul,ol,li,table,hr');
     const text = container.textContent?.replace(/\u00a0/g, ' ').trim() ?? '';
 

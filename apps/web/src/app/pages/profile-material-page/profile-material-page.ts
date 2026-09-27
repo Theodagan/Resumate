@@ -1073,8 +1073,9 @@ export class ProfileMaterialPage implements OnInit, OnDestroy {
       return undefined;
     }
 
-    const container = document.createElement('div');
-    container.innerHTML = trimmedHtml;
+    // DOMParser yields an inert document: unlike innerHTML on a live-document node,
+    // it never loads <img> sources or fires inline handlers from untrusted HTML.
+    const container = new DOMParser().parseFromString(trimmedHtml, 'text/html').body;
     const hasMediaOrStructure = !!container.querySelector('img,video,iframe,ul,ol,li,table,hr');
     const text = container.textContent?.replace(/\u00a0/g, ' ').trim() ?? '';
 

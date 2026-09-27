@@ -24,8 +24,10 @@ on:
         type: string
         required: false
 
+# Read-only by default; only the jobs that attach installers to a release get
+# write access, so dependency installs in the checks job never hold a write token.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   checks:
@@ -67,6 +69,8 @@ jobs:
         working-directory: apps/desktop
 
   desktop-build-macos:
+    permissions:
+      contents: write
     if: ${{ inputs.build_desktop }}
     runs-on: macos-latest
     steps:
@@ -125,6 +129,8 @@ jobs:
           files: ${{ steps.artifact.outputs.path }}
 
   desktop-build-windows:
+    permissions:
+      contents: write
     if: ${{ inputs.build_desktop }}
     runs-on: windows-latest
     steps:
@@ -181,6 +187,8 @@ jobs:
           files: ${{ steps.artifact.outputs.path }}
 
   desktop-build-linux:
+    permissions:
+      contents: write
     if: ${{ inputs.build_desktop }}
     runs-on: ubuntu-latest
     steps:

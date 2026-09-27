@@ -17,7 +17,7 @@
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.json",
-            "optimization": { "fonts": { "inline": false } },
+            "optimization": { "styles": { "minify": true, "inlineCritical": false }, "fonts": { "inline": false } },
             "allowedCommonJsDependencies": ["html2canvas", "qrcode", "quill-delta"],
             "assets": [
               "src/favicon.ico",

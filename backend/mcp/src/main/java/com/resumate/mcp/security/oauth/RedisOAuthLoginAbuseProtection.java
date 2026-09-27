@@ -10,6 +10,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -104,7 +105,10 @@ public class RedisOAuthLoginAbuseProtection implements OAuthLoginAbuseProtection
     }
 
     private static String redisKey(String type, String key) {
-        return KEY_PREFIX + type + ":" + key;
+        // Match the in-memory limiter: case/whitespace variants of an identity must
+        // share one bucket, otherwise "Alice@x" and "alice@x" each get a fresh quota.
+        String normalizedKey = key == null || key.isBlank() ? "unknown" : key.trim().toLowerCase(Locale.ROOT);
+        return KEY_PREFIX + type + ":" + normalizedKey;
     }
 
     private void prune(String redisKey, long now) {

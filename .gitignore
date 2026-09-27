@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.*
+!.env.example
 *.db*
 dist/
 *-plan.md
@@ -26,7 +28,6 @@ apps/web/dist/*
 apps/web/build/
 apps/web/node_modules/
 apps/web/src/assets/runtime-config.json
-apps/web/src/assets/seed.json
 apps/desktop/coverage/
 apps/desktop/test-results.xml
 apps/web/coverage/
