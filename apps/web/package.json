@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --host 0.0.0.0 --proxy-config proxy.conf.js",
+    "start": "ng serve --proxy-config proxy.conf.js",
     "sync:preview-seed": "node scripts/sync-preview-seed.mjs",
     "build": "npm run sync:preview-seed && ng build",
     "watch": "ng build --watch --configuration development",
@@ -32,16 +32,21 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "21.2.20",
+    "@angular-devkit/build-angular": "21.2.24",
     "@angular/cli": "21.2.20",
     "@angular/compiler-cli": "21.2.20",
     "@types/jest": "^30.0.0",
     "@types/qrcode": "^1.5.6",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
-    "jest-junit": "^16.0.0",
+    "jest-junit": "^17.0.0",
     "jest-preset-angular": "^16.1.4",
     "jsdom": "^26.1.0",
     "typescript": "~5.9.0"
+  },
+  "overrides": {
+    "sockjs": {
+      "uuid": "11.1.1"
+    }
   }
 }
