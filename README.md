@@ -259,9 +259,9 @@ Description rapide :
 - `PB_ADMIN_EMAIL` : email du super administrateur PocketBase
 - `PB_ADMIN_PASSWORD` : mot de passe du super administrateur PocketBase
 - `POCKETBASE_INTERNAL_PORT` : port interne écouté par PocketBase dans Docker, non publié sur l'hôte par défaut
-- `MCP_PORT` : port hôte exposé pour le serveur MCP
+- `MCP_PORT` : port hôte du serveur MCP, lié à `127.0.0.1` en production
 - `MCP_INTERNAL_PORT` : port interne écouté par le serveur MCP dans Docker
-- `FRONTEND_PORT` : port hôte exposé pour le frontend Angular
+- `FRONTEND_PORT` : port hôte du frontend Angular, lié à `127.0.0.1` en production
 - `FRONTEND_INTERNAL_PORT` : port interne écouté par le serveur Angular dans Docker
 - `FRONTEND_BASE_URL` : URL publique du frontend, utilisée notamment par le MCP
 - `POCKETBASE_SERVICE_USER_EMAIL` : compte de service utilisé par le serveur MCP
@@ -337,6 +337,23 @@ cd apps/web && npm run build
 La suite couvre les tests unitaires Angular, les tests desktop, les tests MCP et les tests Material MCP. Les workflows GitHub exécutent les contrôles frontend, desktop et MCP sur chaque pull request vers `dev` ou `main`.
 
 Pour l'hébergement, configurez des valeurs uniques et secrètes pour `PB_ADMIN_PASSWORD`, `POCKETBASE_SERVICE_USER_PASSWORD` et `MCP_OAUTH_JWK`; ne publiez que le frontend et, si nécessaire, le MCP derrière HTTPS. PocketBase reste interne au réseau Docker par défaut.
+
+### Déploiement Coolify (Docker Compose)
+
+- Configurez les domaines HTTPS Coolify sur les **ports des conteneurs** : frontend `80`, MCP `${MCP_INTERNAL_PORT:-8081}`. PocketBase reste accessible uniquement aux autres conteneurs, sans domaine ni port hôte public. Vérifiez les routes réellement générées par Coolify avant de modifier les ports ; n'activez pas d'override Compose de développement ou une route « raw » vers les ports hôte.
+- Les ports hôte `${FRONTEND_PORT:-4200}` et `${MCP_PORT:-8081}` sont liés à `127.0.0.1`. Confirmez la configuration effective sans afficher les variables secrètes :
+
+  ```bash
+  docker compose --env-file .env -f docker/docker-compose.yml config --format json \
+    | jq -r '.services | to_entries[] | .key as $service | .value.ports[]? | "\($service): \(.host_ip):\(.published) -> \(.target)"'
+  ```
+
+- Le proxy frontend conserve `/api/` et le tableau de bord PocketBase `/_/` sur le domaine public : ce dernier **reste accessible avec le mot de passe administrateur**, conformément à la configuration actuelle. Utilisez des identifiants administrateur et MCP distincts, forts et uniques. Les CV publics, les téléchargements MCP non authentifiés des CV créés par MCP, et les routes OAuth/MCP doivent rester accessibles via leurs domaines HTTPS.
+- Les fichiers téléversés (documents et images non publiées) ne sont téléchargeables que par leur propriétaire avec un jeton de fichier PocketBase à durée courte, ou par un superutilisateur. Sans connexion, seules les images liées à un CV `public=true` du même propriétaire sont téléchargeables. Les images privées de l'éditeur utilisent des URL à jeton court ; ne copiez pas ces URL dans des journaux ou des liens partagés. La publicité du CV créé par MCP est intentionnelle : toute personne disposant du lien peut consulter son contenu.
+
+**Avant déploiement :** vérifiez la version PocketBase utilisée par l'image (actuellement `latest`) avec le hook `onFileDownloadRequest` et la validation des jetons ; faites une sauvegarde de `backend/pocketbase/pb_data` et préparez un retour à l'image/hooks précédents. Testez d'abord sur une instance isolée migrée avec `bash scripts/mcp-pocketbase-smoke.sh` (utilisez `CHECK_FILE_TOKEN_EXPIRY=1` pour vérifier aussi l'expiration selon la durée configurée par PocketBase). N'utilisez pas l'instance de production pour ce test : il crée temporairement comptes, CV et fichiers.
+
+**Après déploiement :** depuis une autre machine, confirmez que les ports IP du serveur (`4200`/`8081` ou ceux configurés) ne répondent pas. Sur les domaines HTTPS, vérifiez `/api/health`, la connexion de l'utilisateur, un CV public avec ses images, le refus d'un CV privé sans connexion, le comportement d'authentification `/mcp` et de découverte OAuth, et la connexion administrateur via `/_/`. Vérifiez qu'une URL de document privé connue renvoie `404` sans connexion, qu'une image publiée répond `200` sans connexion et que le propriétaire peut toujours afficher une image privée dans l'éditeur. Les règles ne retirent pas les copies de fichiers qui auraient déjà été téléchargées avant ce changement.
 
 ### Templates CV
 

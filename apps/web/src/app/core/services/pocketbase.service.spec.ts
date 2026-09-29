@@ -15,7 +15,7 @@ describe('PocketBaseService', () => {
   let currentUserId: string | null;
   let pb: {
     collection: jest.Mock;
-    files: { getURL: jest.Mock };
+    files: { getURL: jest.Mock; getToken: jest.Mock };
     send: jest.Mock;
   };
 
@@ -35,7 +35,11 @@ describe('PocketBaseService', () => {
         };
         return collections[name];
       }),
-      files: { getURL: jest.fn((record, filename) => `https://files.test/${record.id}/${filename}`) },
+      files: {
+        getURL: jest.fn((record, filename, options) =>
+          `https://files.test/${record.id}/${filename}${options?.token ? `?token=${options.token}` : ''}`),
+        getToken: jest.fn().mockResolvedValue('short-lived-file-token'),
+      },
       send: jest.fn(),
     };
 
@@ -72,16 +76,60 @@ describe('PocketBaseService', () => {
 
     expect(collections['cv_profiles']['getOne']).toHaveBeenCalledWith('profile-1', { expand: 'user,profilePictureFile,coverPictureFile' });
     expect(profile.extra).toEqual({});
-    expect(profile.profilePicture).toBe('https://files.test/file-1/portrait.png');
-    expect(profile.coverPicture).toBe('https://files.test/file-2/banner.png');
-    expect(profile.expand?.user?.profilePicture).toBe('https://files.test/user-1/user.png');
+    expect(profile.profilePicture).toBe('https://files.test/file-1/portrait.png?token=short-lived-file-token');
+    expect(profile.coverPicture).toBe('https://files.test/file-2/banner.png?token=short-lived-file-token');
+    expect(profile.expand?.user?.profilePicture).toBe('https://files.test/user-1/user.png?token=short-lived-file-token');
   });
 
   it('returns null for blank users and normalizes fetched users', async () => {
     expect(await service.getUser('')).toBeNull();
     collections['users'] = { getOne: jest.fn().mockResolvedValue({ id: 'user-1', profilePicture: 'me.png' }) } as never;
 
-    await expect(service.getUser('user-1')).resolves.toMatchObject({ profilePicture: 'https://files.test/user-1/me.png' });
+    await expect(service.getUser('user-1')).resolves.toMatchObject({ profilePicture: 'https://files.test/user-1/me.png?token=short-lived-file-token' });
+  });
+
+  it('refreshes the short-lived owner file token and never attaches it to another user’s images', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    pb.files.getToken.mockResolvedValueOnce('first-file-token').mockResolvedValueOnce('refreshed-file-token');
+    collections['users'] = {
+      getOne: jest.fn((id: string) => Promise.resolve({ id, profilePicture: 'photo.png' })),
+    } as never;
+
+    try {
+      const own = await service.getUser('user-1');
+      expect(own?.profilePicture).toContain('token=first-file-token');
+      const other = await service.getUser('user-2');
+      expect(other?.profilePicture).toBe('https://files.test/user-2/photo.png');
+
+      clock.mockReturnValue(62_000);
+      const refreshed = await service.getUser('user-1');
+      expect(refreshed?.profilePicture).toContain('token=refreshed-file-token');
+      expect(pb.files.getToken).toHaveBeenCalledTimes(2);
+
+      currentUserId = null;
+      const guest = await service.getUser('user-1');
+      expect(guest?.profilePicture).toBe('https://files.test/user-1/photo.png');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('honors the PocketBase file token expiry even when it is shorter than a minute', async () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    const shortToken = `header.${btoa(JSON.stringify({ exp: 30 }))}.signature`;
+    pb.files.getToken.mockResolvedValueOnce(shortToken).mockResolvedValueOnce('replacement-token');
+    collections['users'] = {
+      getOne: jest.fn().mockResolvedValue({ id: 'user-1', profilePicture: 'private.png' }),
+    } as never;
+
+    try {
+      expect((await service.getUser('user-1'))?.profilePicture).toContain(`token=${shortToken}`);
+      clock.mockReturnValue(16_000);
+      expect((await service.getUser('user-1'))?.profilePicture).toContain('token=replacement-token');
+      expect(pb.files.getToken).toHaveBeenCalledTimes(2);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('loads ordered related records in the requested order', async () => {
@@ -291,7 +339,7 @@ describe('PocketBaseService', () => {
       user: { id: 'user-1', firstName: 'Jane', github: 'https://github.test/original', profilePicture: 'u.png' },
       jobs: [{ id: 'job-1' }],
       projects: [{ id: 'project-1', picture: 'project.png' }],
-      skills: [{ id: 'skill-1', name: 'Angular' }],
+      skills: [{ id: 'skill-1', name: 'Angular', icon: 'angular.svg' }],
       degrees: [{ id: 'degree-1' }],
       achievements: [{ id: 'achievement-1' }],
       hobbies: [{ id: 'hobby-1' }],
@@ -303,10 +351,11 @@ describe('PocketBaseService', () => {
       method: 'GET',
       requestKey: 'cv-data-by-slug-classic--profile-1',
     });
-    expect(data.profile.profilePicture).toBe('https://files.test/file-1/portrait.png');
-    expect(data.user?.profilePicture).toBe('https://files.test/user-1/u.png');
+    expect(data.profile.profilePicture).toBe('https://files.test/file-1/portrait.png?token=short-lived-file-token');
+    expect(data.user?.profilePicture).toBe('https://files.test/user-1/u.png?token=short-lived-file-token');
     expect(data.user?.github).toBe('https://github.test/override');
     expect(data.projects[0].picture).toBe('https://files.test/project-1/project.png');
+    expect(data.skills[0].icon).toBe('https://files.test/skill-1/angular.svg');
   });
 
   it('gets profile by slug without using the owner-only cv_profiles list API or users getOne', async () => {
@@ -323,7 +372,7 @@ describe('PocketBaseService', () => {
 
     const profile = await service.getCvProfileBySlug('classic--profile-1');
 
-    expect(profile.profilePicture).toBe('https://files.test/profile-1/p.png');
+    expect(profile.profilePicture).toBe('https://files.test/profile-1/p.png?token=short-lived-file-token');
     expect(collections['cv_profiles']).toBeUndefined();
     expect(collections['users']).toBeUndefined();
   });
@@ -423,11 +472,14 @@ describe('PocketBaseService', () => {
     expect(projects[0].picture).toBe('https://files.test/p1/pic.png');
 
     collections['skills'] = {
-      getFullList: jest.fn().mockResolvedValue([{ id: 's1', name: 'S', expand: { category: { id: 'c1', name: 'Cat' } } }]),
+      getFullList: jest.fn().mockResolvedValue([{
+        id: 's1', user: 'user-1', name: 'S', icon: 'skill.svg', expand: { category: { id: 'c1', name: 'Cat' } },
+      }]),
     } as never;
     const skills = await service.getSkills(['s1']);
     expect(skills).toHaveLength(1);
     expect(skills[0].expand?.category?.name).toBe('Cat');
+    expect(skills[0].icon).toBe('https://files.test/s1/skill.svg?token=short-lived-file-token');
   });
 
   it('gets editor data with all collections', async () => {

@@ -284,6 +284,101 @@ onRecordUpdateRequest((e) => {
   return e.next();
 }, 'projects');
 
+// File fields are unprotected at the schema level because some CV images must
+// remain viewable without a login. Enforce the actual per-record policy here:
+// only owners (with a short-lived file token) and images used by a public CV.
+onFileDownloadRequest((e) => {
+  if (e.hasSuperuserAuth()) return e.next();
+
+  const collection = e.collection.name;
+  const field = e.fileField.name;
+  const record = e.record;
+  const ownerId = collection === 'users' ? record.id : record.getString('user');
+  const allowedFields = {
+    users: ['avatar', 'profilePicture', 'coverPicture'],
+    cv_profiles: ['profilePicture', 'coverPicture'],
+    files: ['file'],
+    projects: ['picture'],
+    skills: ['icon'],
+  };
+
+  if (!ownerId || !allowedFields[collection]?.includes(field)) {
+    throw new NotFoundError('File not found.');
+  }
+
+  const token = e.requestInfo().query.token;
+  if (token) {
+    try {
+      const fileAuth = $app.findAuthRecordByToken(token, 'file');
+      if (fileAuth.id === ownerId || fileAuth.isSuperuser()) return e.next();
+    } catch (_) {
+      // Invalid, expired or unrelated file token: fall through to public CV policy.
+    }
+  }
+
+  // Direct API clients can also use their Authorization header; img tags use
+  // the short-lived ?token= URL above because browsers don't attach the SDK JWT.
+  if (e.auth?.id === ownerId) return e.next();
+
+  // Don't expose PDFs (or arbitrary uploads mislabeled as images) through a
+  // public CV relation. Only images selected on that owner's public CV qualify.
+  if (!/\.(?:png|jpe?g|gif|webp|avif|svg)$/i.test(e.servedName) ||
+      (collection === 'files' && record.getString('kind') !== 'image')) {
+    throw new NotFoundError('File not found.');
+  }
+
+  let publicProfiles;
+  try {
+    publicProfiles = $app.findRecordsByFilter(
+      'cv_profiles', 'public = true && user = {:owner}', '', 0, 0, { owner: ownerId },
+    );
+  } catch (_) {
+    throw new NotFoundError('File not found.');
+  }
+
+  const selected = (profile, relation) => Array.from(profile.get(relation) || []);
+  let publicImage = false;
+  if (collection === 'cv_profiles') {
+    publicImage = record.getBool('public');
+  } else if (collection === 'users') {
+    // The CV response includes these two identity images, but not the avatar.
+    publicImage = field !== 'avatar' && publicProfiles.length > 0;
+  } else if (collection === 'projects' || collection === 'skills') {
+    publicImage = publicProfiles.some((profile) => selected(profile, collection).includes(record.id));
+  } else if (collection === 'files') {
+    publicImage = publicProfiles.some((profile) => {
+      if (profile.getString('profilePictureFile') === record.id ||
+          profile.getString('coverPictureFile') === record.id) return true;
+
+      return selected(profile, 'projects').some((projectId) => {
+        try {
+          const project = $app.findRecordById('projects', projectId);
+          return project.getString('user') === ownerId && project.getString('file') === record.id;
+        } catch (_) {
+          return false;
+        }
+      });
+    });
+  }
+
+  if (!publicImage) throw new NotFoundError('File not found.');
+  return e.next();
+});
+
+// A public CV record is readable through PocketBase's built-in view endpoint,
+// not just the custom by-slug response. Keep dashboard-only metadata private
+// across built-in view, list, expansions and realtime enrichments.
+onRecordEnrich((e) => {
+  const auth = e.requestInfo.auth;
+  if (!e.requestInfo.hasSuperuserAuth() &&
+      auth?.id !== e.record.getString('user') &&
+      !auth?.getBool('isMcpServiceAccount')) {
+    e.record.hide('label');
+    e.record.hide('status');
+  }
+  return e.next();
+}, 'cv_profiles');
+
 onRecordCreateRequest((e) => {
   if (!e.auth) {
     throw new UnauthorizedError('Authentication required.');
@@ -373,7 +468,9 @@ const getPublicCvDataBySlugHandler = (e) => {
   };
 
   const serializeRecord = (record, fieldNames) => {
-    const result = { id: record.id };
+    // The SDK needs collectionId to turn file names in this custom response
+    // into download URLs (including those of expanded public CV images).
+    const result = { id: record.id, collectionId: record.collection().id, collectionName: record.collection().name };
 
     for (const fieldName of fieldNames) {
       result[fieldName] = record.get(fieldName);
@@ -448,7 +545,6 @@ const getPublicCvDataBySlugHandler = (e) => {
 
   const publicProfile = serializeRecord(profileRecord, [
     'slug',
-    'label',
     'profileName',
     'template',
     'public',
@@ -457,11 +553,11 @@ const getPublicCvDataBySlugHandler = (e) => {
     'coverPicture',
     'extra',
     'linkOverrides',
-    'status',
     'updated_at',
   ]);
 
-  const responseProfile = isOwner ? profile : publicProfile;
+  const canSeeInternalProfileFields = isOwner || e.hasSuperuserAuth() || e.auth?.getBool('isMcpServiceAccount');
+  const responseProfile = canSeeInternalProfileFields ? profile : publicProfile;
 
   responseProfile.expand = {};
   for (const fieldName of ['profilePictureFile', 'coverPictureFile']) {

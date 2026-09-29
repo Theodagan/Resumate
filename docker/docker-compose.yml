@@ -26,7 +26,7 @@ services:
     container_name: resumate-mcp
     restart: unless-stopped
     ports:
-      - "${MCP_PORT:-8081}:${MCP_INTERNAL_PORT:-8081}"
+      - "127.0.0.1:${MCP_PORT:-8081}:${MCP_INTERNAL_PORT:-8081}"
     environment:
       PORT: ${MCP_INTERNAL_PORT:-8081}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:${FRONTEND_PORT:-4200}}
@@ -49,7 +49,7 @@ services:
     container_name: resumate-web
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-4200}:80"
+      - "127.0.0.1:${FRONTEND_PORT:-4200}:80"
     environment:
       BUG_REPORT_URL: ${BUG_REPORT_URL:-}
       MCP_PUBLIC_BASE_URL: ${MCP_PUBLIC_BASE_URL:-}

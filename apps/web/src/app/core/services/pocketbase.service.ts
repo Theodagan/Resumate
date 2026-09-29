@@ -58,12 +58,15 @@ export class PocketBaseService {
   private readonly authService = inject(AuthService);
   private readonly pb = this.pocketBaseClient.pb;
   private readonly cvProfileExpand = 'user,profilePictureFile,coverPictureFile';
+  private fileToken: { userId: string; value: string; expiresAt: number } | null = null;
+  private fileTokenRequest: Promise<void> | null = null;
 
   async getCvProfileById(cvProfileId: string): Promise<CvProfile> {
     const profile = await this.pb.collection<CvProfile>('cv_profiles').getOne(cvProfileId, {
       expand: this.cvProfileExpand,
     });
 
+    await this.prepareFileToken();
     return this.normalizeCvProfile(profile);
   }
 
@@ -77,6 +80,7 @@ export class PocketBaseService {
       requestKey: `cv-data-by-slug-${slug}`,
     });
 
+    await this.prepareFileToken();
     return this.normalizeCvData(cvData as CvData);
   }
 
@@ -87,6 +91,7 @@ export class PocketBaseService {
 
     const user = await this.pb.collection<User>('users').getOne(userId);
 
+    await this.prepareFileToken();
     return this.normalizeUser(user);
   }
 
@@ -97,12 +102,14 @@ export class PocketBaseService {
   async getProjects(projectIds: string[]): Promise<Project[]> {
     const projects = await this.getOrderedRecords<Project>('projects', projectIds, '+sortOrder,-date', 'file');
 
+    await this.prepareFileToken();
     return projects.map((project) => this.normalizeProject(project));
   }
 
   async getSkills(skillIds: string[]): Promise<Skill[]> {
     const skills = await this.getOrderedRecords<Skill>('skills', skillIds, '+sortOrder,+name', 'category');
 
+    await this.prepareFileToken();
     return skills.map((skill) => this.normalizeSkill(skill));
   }
 
@@ -124,6 +131,7 @@ export class PocketBaseService {
       expand: this.cvProfileExpand,
     });
 
+    await this.prepareFileToken();
     return profiles.map((profile) => this.normalizeCvProfile(profile));
   }
 
@@ -135,6 +143,7 @@ export class PocketBaseService {
       expand: this.cvProfileExpand,
     });
 
+    await this.prepareFileToken();
     return profiles.map((profile) => this.normalizeCvProfile(profile));
   }
 
@@ -146,6 +155,7 @@ export class PocketBaseService {
         expand: this.cvProfileExpand,
       });
 
+    await this.prepareFileToken();
     return this.normalizeCvProfile(profile);
   }
 
@@ -187,6 +197,7 @@ export class PocketBaseService {
       slug: `${trimmedTemplate}--${created.id}`,
     });
 
+    await this.prepareFileToken();
     return this.normalizeCvProfile(updated);
   }
 
@@ -199,6 +210,7 @@ export class PocketBaseService {
       slug: `${template}--${profile.id}`,
     });
 
+    await this.prepareFileToken();
     return this.normalizeCvProfile(updated);
   }
 
@@ -209,6 +221,7 @@ export class PocketBaseService {
       public: isPublic,
     });
 
+    await this.prepareFileToken();
     return this.normalizeCvProfile(updated);
   }
 
@@ -248,6 +261,7 @@ export class PocketBaseService {
       slug: template ? `${template}--${profile.id}` : profile.slug,
     });
 
+    await this.prepareFileToken();
     return this.normalizeCvProfile(updated);
   }
 
@@ -268,6 +282,7 @@ export class PocketBaseService {
 
     const updated = await this.pb.collection<CvProfile>('cv_profiles').update(profile.id, formData);
 
+    await this.prepareFileToken();
     return this.normalizeCvProfile(updated);
   }
 
@@ -284,6 +299,7 @@ export class PocketBaseService {
         this.getCurrentUserOwnedRecords<MediaFile>('files', '+sortOrder,+name'),
       ]);
 
+    await this.prepareFileToken();
     return {
       profile,
       availableJobs,
@@ -308,6 +324,7 @@ export class PocketBaseService {
       this.getCurrentUserOwnedRecords<MediaFile>('files', '+sortOrder,+name'),
     ]);
 
+    await this.prepareFileToken();
     return {
       jobs,
       skills: skills.map((skill) => this.normalizeSkill(skill)),
@@ -343,6 +360,7 @@ export class PocketBaseService {
       category: input.category || null,
     });
 
+    await this.prepareFileToken();
     return this.normalizeSkill(created);
   }
 
@@ -355,6 +373,7 @@ export class PocketBaseService {
       category: input.category || null,
     });
 
+    await this.prepareFileToken();
     return this.normalizeSkill(updated);
   }
 
@@ -388,6 +407,7 @@ export class PocketBaseService {
     const currentUserId = this.requireCurrentUserId();
     const created = await this.pb.collection<Project>('projects').create(this.toProjectFormData(input, currentUserId));
 
+    await this.prepareFileToken();
     return this.normalizeProject(created);
   }
 
@@ -396,6 +416,7 @@ export class PocketBaseService {
     const project = await this.pb.collection<Project>('projects').getFirstListItem(`id="${projectId}" && user="${currentUserId}"`);
     const updated = await this.pb.collection<Project>('projects').update(project.id, this.toProjectFormData(input));
 
+    await this.prepareFileToken();
     return this.normalizeProject(updated);
   }
 
@@ -453,6 +474,7 @@ export class PocketBaseService {
 
     const created = await this.pb.collection<MediaFile>('files').create(this.toMediaFileFormData(input, currentUserId));
 
+    await this.prepareFileToken();
     return this.normalizeMediaFile(created);
   }
 
@@ -461,6 +483,7 @@ export class PocketBaseService {
     const file = await this.pb.collection<MediaFile>('files').getFirstListItem(`id="${fileId}" && user="${currentUserId}"`);
     const updated = await this.pb.collection<MediaFile>('files').update(file.id, this.toMediaFileFormData(input));
 
+    await this.prepareFileToken();
     return this.normalizeMediaFile(updated);
   }
 
@@ -477,6 +500,7 @@ export class PocketBaseService {
   async updateCurrentUser(input: UpdateCurrentUserInput): Promise<User> {
     const currentUserId = this.requireCurrentUserId();
     const updated = await this.pb.collection<User>('users').update(currentUserId, input);
+    await this.prepareFileToken();
     return this.normalizeUser(updated) as User;
   }
 
@@ -733,15 +757,15 @@ export class PocketBaseService {
       throw new Error('CV profile not found.');
     }
 
-    const profilePictureFile = profile.expand?.profilePictureFile ? this.normalizeMediaFile(profile.expand.profilePictureFile as MediaFile & RecordModel) : undefined;
-    const coverPictureFile = profile.expand?.coverPictureFile ? this.normalizeMediaFile(profile.expand.coverPictureFile as MediaFile & RecordModel) : undefined;
+    const profilePictureFile = profile.expand?.profilePictureFile ? this.normalizeMediaFile(profile.expand.profilePictureFile as MediaFile & RecordModel, profile.user) : undefined;
+    const coverPictureFile = profile.expand?.coverPictureFile ? this.normalizeMediaFile(profile.expand.coverPictureFile as MediaFile & RecordModel, profile.user) : undefined;
 
     return {
       ...profile,
       extra: profile.extra ?? {},
       professionalSummary: this.normalizeEditorHtmlField(profile.professionalSummary),
-      profilePicture: profilePictureFile?.file || this.getFileFieldUrl(profile as unknown as RecordModel, profile.profilePicture),
-      coverPicture: coverPictureFile?.file || this.getFileFieldUrl(profile as unknown as RecordModel, profile.coverPicture),
+      profilePicture: profilePictureFile?.file || this.getFileFieldUrl(profile as unknown as RecordModel, profile.profilePicture, profile.user),
+      coverPicture: coverPictureFile?.file || this.getFileFieldUrl(profile as unknown as RecordModel, profile.coverPicture, profile.user),
       expand: profile.expand
         ? {
             ...profile.expand,
@@ -793,8 +817,8 @@ export class PocketBaseService {
 
     return {
       ...user,
-      profilePicture: this.getFileFieldUrl(user as unknown as RecordModel, user.profilePicture),
-      coverPicture: this.getFileFieldUrl(user as unknown as RecordModel, user.coverPicture),
+      profilePicture: this.getFileFieldUrl(user as unknown as RecordModel, user.profilePicture, user.id),
+      coverPicture: this.getFileFieldUrl(user as unknown as RecordModel, user.coverPicture, user.id),
     };
   }
 
@@ -805,7 +829,7 @@ export class PocketBaseService {
 
     return {
       ...project,
-      picture: this.getFileFieldUrl(project as unknown as RecordModel, project.picture),
+      picture: this.getFileFieldUrl(project as unknown as RecordModel, project.picture, project.user),
     };
   }
 
@@ -816,6 +840,7 @@ export class PocketBaseService {
 
     return {
       ...skill,
+      icon: this.getFileFieldUrl(skill as unknown as RecordModel, skill.icon, skill.user),
       expand: skill.expand
         ? {
             ...skill.expand,
@@ -825,14 +850,14 @@ export class PocketBaseService {
     };
   }
 
-  private normalizeMediaFile(file: MediaFile | null): MediaFile {
+  private normalizeMediaFile(file: MediaFile | null, ownerId?: string): MediaFile {
     if (!file) {
       throw new Error('File not found.');
     }
 
     return {
       ...file,
-      file: this.getFileFieldUrl(file as unknown as RecordModel, file.file) || file.file,
+      file: this.getFileFieldUrl(file as unknown as RecordModel, file.file, file.user ?? ownerId) || file.file,
     };
   }
 
@@ -918,12 +943,59 @@ export class PocketBaseService {
     );
   }
 
-  private getFileFieldUrl(record: RecordModel, filename: string | undefined): string | undefined {
+  private getFileFieldUrl(record: RecordModel, filename: string | undefined, ownerId?: string): string | undefined {
     if (!filename) {
       return undefined;
     }
 
+    const currentUserId = this.authService.getCurrentUserId();
+    const token = this.fileToken;
+    if (ownerId && ownerId === currentUserId && token?.userId === currentUserId && token.expiresAt > Date.now()) {
+      return this.pb.files.getURL(record, filename, { token: token.value });
+    }
+
     return this.pb.files.getURL(record, filename);
+  }
+
+  private async prepareFileToken(): Promise<void> {
+    const userId = this.authService.getCurrentUserId();
+    if (!userId) {
+      this.fileToken = null;
+      return;
+    }
+
+    if (this.fileToken?.userId === userId && this.fileToken.expiresAt > Date.now()) return;
+    if (this.fileTokenRequest) {
+      await this.fileTokenRequest;
+      if (this.fileToken?.userId === userId && this.fileToken.expiresAt > Date.now()) return;
+    }
+
+    this.fileTokenRequest = (async () => {
+      try {
+        const token = await this.pb.files.getToken();
+        if (this.authService.getCurrentUserId() === userId) {
+          let expiresAt = Date.now() + 60_000;
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            if (typeof payload.exp === 'number') {
+              expiresAt = Math.min(expiresAt, payload.exp * 1000 - 15_000);
+            }
+          } catch {
+            // Fallback for non-JWT tokens; the server still validates each URL.
+          }
+          this.fileToken = { userId, value: token, expiresAt };
+        }
+      } catch {
+        // Public CVs and normal API errors still behave independently of file-token issuance.
+        this.fileToken = null;
+      }
+    })();
+
+    try {
+      await this.fileTokenRequest;
+    } finally {
+      this.fileTokenRequest = null;
+    }
   }
 
   private requireCurrentUserId(): string {
