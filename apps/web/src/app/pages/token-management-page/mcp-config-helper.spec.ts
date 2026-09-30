@@ -66,7 +66,7 @@ describe('McpConfigHelper', () => {
     expect(config).toContain('Transport          : HTTP (Streamable)');
     expect(config).toContain('Méthode auth       : Clé API');
     expect(config).toContain('Clé API            : rmcp_custom');
-    expect(config).toContain('Outils disponibles : list_resumes');
+    expect(config).toContain('Resumate-Tool-Families: both');
   });
 
   it('generates config for the selected agent', () => {
@@ -79,6 +79,14 @@ describe('McpConfigHelper', () => {
     expect(config).toContain('"resumate"');
     expect(config).toContain('"API_KEY": "rmcp_test"');
     expect(config).toContain('http://localhost:8080/mcp');
+  });
+
+  it('narrows the client configuration to the selected family', () => {
+    component.selectedAgent.set('opencode');
+    component.selectedFamilies.set('materials');
+    expect(component.getGeneratedConfig()).toContain('"Resumate-Tool-Families": "materials"');
+    component.selectedFamilies.set('cv');
+    expect(component.getGeneratedConfig()).toContain('"Resumate-Tool-Families": "cv"');
   });
 
   it('generates Codex HTTP config for the Codex preset', () => {
@@ -148,14 +156,15 @@ describe('McpConfigHelper', () => {
     it('returns structured custom client config fields', () => {
       const fields = component.customClientConfig();
 
-      expect(fields.length).toBe(6);
+      expect(fields.length).toBe(7);
       expect(fields[0]).toEqual({ key: 'URL du serveur MCP', value: 'https://example.com/mcp', copyable: true });
       expect(fields[1]).toEqual({ key: 'Transport', value: 'HTTP (Streamable)', copyable: false });
       expect(fields[2]).toEqual({ key: "Méthode d'authentification", value: 'Clé API', copyable: false });
       expect(fields[3]).toEqual({ key: "Header d'autorisation", value: 'Authorization: Bearer rmcp_custom_token', copyable: true });
       expect(fields[4]).toEqual({ key: 'Clé API', value: 'rmcp_custom_token', copyable: true });
-      expect(fields[5].key).toBe('Outils disponibles');
-      expect(fields[5].copyable).toBe(false);
+      expect(fields[5]).toEqual({ key: 'Header outils', value: 'Resumate-Tool-Families: both', copyable: true });
+      expect(fields[6].key).toBe('Outils disponibles');
+      expect(fields[6].copyable).toBe(false);
     });
 
     it('uses placeholder token when no custom token is set', () => {
@@ -169,7 +178,7 @@ describe('McpConfigHelper', () => {
     it('shows structured key-value list in the template', () => {
       const kvItems = fixture.nativeElement.querySelectorAll('.mcp-helper__kv-item');
 
-      expect(kvItems.length).toBe(6);
+      expect(kvItems.length).toBe(7);
       expect(kvItems[0].textContent).toContain('URL du serveur MCP');
       expect(kvItems[0].textContent).toContain('https://example.com/mcp');
     });
@@ -243,8 +252,8 @@ describe('McpConfigHelper', () => {
     it('has copy buttons only for copyable fields', () => {
       const copyButtons = fixture.nativeElement.querySelectorAll('.mcp-helper__kv-copy');
 
-      // Only copyable fields: URL du serveur MCP, Header d'autorisation, Clé API = 3 copy buttons
-      expect(copyButtons.length).toBe(3);
+      // URL, authentication header, key, and optional tool-family header.
+      expect(copyButtons.length).toBe(4);
     });
   });
 

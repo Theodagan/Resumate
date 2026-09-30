@@ -16,6 +16,23 @@
     </section>
 
     <section class="section account-panels">
+      <article class="panel" aria-labelledby="mcp-access-title">
+        <div class="panel__head"><div><p class="eyebrow">Assistant IA</p><h2 id="mcp-access-title">Accès aux outils MCP</h2></div></div>
+        <div class="panel__body">
+          <p class="panel-intro">Définissez les outils accessibles à tous vos clients MCP. La création de matériel est désactivée par défaut.</p>
+          <form class="form-grid" (ngSubmit)="saveMcpPreferences()">
+            @if (mcpError()) { <p class="af-message af-message--error field--full">{{ mcpError() }}</p> }
+            @if (mcpSaved()) { <p class="af-message af-message--success field--full">Préférences MCP enregistrées.</p> }
+            <label class="field field--full"><span>CV (création et mise à jour)</span>
+              <input type="checkbox" name="mcpCvEnabled" [ngModel]="mcpCvEnabled()" (ngModelChange)="mcpCvEnabled.set($event)" />
+            </label>
+            <label class="field field--full"><span>Matériaux (création et mise à jour)</span>
+              <input type="checkbox" name="mcpMaterialsEnabled" [ngModel]="mcpMaterialsEnabled()" (ngModelChange)="mcpMaterialsEnabled.set($event)" />
+            </label>
+            <div class="form-actions field--full"><button class="btn btn--primary" type="submit" [disabled]="mcpSaving()">Enregistrer les accès MCP</button></div>
+          </form>
+        </div>
+      </article>
       <article class="panel" aria-labelledby="style-guidance-title">
         <div class="panel__head">
           <div>

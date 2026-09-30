@@ -286,6 +286,60 @@ public class PocketBaseClient {
         }
     }
 
+    public Map<String, Object> mcpPreferences(String userId) {
+        Map<String, Object> user = getRecordById("users", userId, Map.class);
+        if (user == null || !userId.equals(user.get("id"))) {
+            throw new IllegalStateException("MCP account preferences are unavailable.");
+        }
+        return user;
+    }
+
+    public Map<String, Object> createMaterial(String collection, String userId, Map<String, Object> fields) {
+        validateMaterialFields(collection, userId, fields);
+        Map<String, Object> body = new LinkedHashMap<>(fields);
+        body.put("user", userId);
+        return postCollectionRecord(collection, body, Map.class);
+    }
+
+    public Map<String, Object> updateMaterial(String collection, String userId, String id, Map<String, Object> fields) {
+        if (!StringUtils.hasText(id)) throw new IllegalArgumentException("A material record id is required.");
+        validateMaterialFields(collection, userId, fields);
+        validateOwnedRecordIds(collection, userId, List.of(id));
+        return patchCollectionRecord(collection, id, fields, Map.class);
+    }
+
+    private void validateMaterialFields(String collection, String userId, Map<String, Object> fields) {
+        if (!List.of("projects", "achievements", "skills", "jobs", "degrees", "hobbies").contains(collection)) {
+            throw new IllegalArgumentException("Unsupported material collection.");
+        }
+        if (!StringUtils.hasText(userId) || fields == null || fields.isEmpty() || fields.containsKey("user")) {
+            throw new IllegalArgumentException("Material fields and authenticated owner are required; owner cannot be changed.");
+        }
+        if ("projects".equals(collection)) {
+            validateRelation(fields, "achievements", "achievements", userId);
+            if (fields.get("file") != null) {
+                if (!(fields.get("file") instanceof String fileId) || !StringUtils.hasText(fileId)) {
+                    throw new IllegalArgumentException("Invalid file ID.");
+                }
+                validateOwnedRecordIds("files", userId, List.of(fileId));
+            }
+        }
+        if ("jobs".equals(collection)) {
+            validateRelation(fields, "skills", "skills", userId);
+            validateRelation(fields, "projects", "projects", userId);
+            validateRelation(fields, "achievements", "achievements", userId);
+        }
+    }
+
+    private void validateRelation(Map<String, Object> fields, String field, String collection, String userId) {
+        Object value = fields.get(field);
+        if (value == null) return;
+        if (!(value instanceof List<?> ids) || ids.stream().anyMatch(id -> !(id instanceof String))) {
+            throw new IllegalArgumentException("Invalid relation IDs for " + field);
+        }
+        validateOwnedRecordIds(collection, userId, (List<String>) ids);
+    }
+
     public List<CvProfileSummaryRecord> listCvProfilesForUser(String userId) {
         RecordListResponse<CvProfileSummaryRecord> response = getCollectionRecords(
                 "cv_profiles",

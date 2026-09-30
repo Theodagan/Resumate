@@ -13,6 +13,10 @@ onRecordCreateRequest((e) => {
   }
 
   const collection = record.collection();
+  if (collection.fields.getByName('mcpCvEnabled')) {
+    // New accounts retain the pre-existing CV MCP access by default.
+    record.set('mcpCvEnabled', true);
+  }
   for (const fieldName of ['isMcpServiceAccount', 'bypassBilling', 'subscriptionStatus', 'stripeCustomerId', 'stripeSubscriptionId']) {
     if (!collection.fields.getByName(fieldName)) continue;
 
@@ -268,7 +272,9 @@ onRecordCreateRequest((e) => {
     return e.next();
   }
 
-  record.set('user', e.auth.id);
+  if (!e.auth.getBool('isMcpServiceAccount')) {
+    record.set('user', e.auth.id);
+  }
   return e.next();
 }, 'projects');
 
@@ -393,7 +399,9 @@ onRecordCreateRequest((e) => {
     return e.next();
   }
 
-  record.set('user', e.auth.id);
+  if (!e.auth.getBool('isMcpServiceAccount')) {
+    record.set('user', e.auth.id);
+  }
   return e.next();
 }, 'achievements');
 

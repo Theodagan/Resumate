@@ -17,6 +17,8 @@ class AuthServiceStub {
 }
 
 class PocketBaseServiceStub {
+  getCurrentUserMcpPreferences = jest.fn().mockResolvedValue({ mcpCvEnabled: true, mcpMaterialsEnabled: false });
+  saveCurrentUserMcpPreferences = jest.fn().mockResolvedValue(undefined);
   changeCurrentUserPassword = jest.fn<Promise<void>, []>().mockResolvedValue(undefined);
   updateCurrentUser = jest.fn<Promise<unknown>, [unknown]>().mockResolvedValue({ id: 'user-123' });
   getCurrentProfileMetadata = jest.fn().mockResolvedValue({
@@ -72,6 +74,23 @@ describe('AccountPage', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('loads and saves independent MCP family preferences', async () => {
+    expect(component.mcpCvEnabled()).toBe(true);
+    expect(component.mcpMaterialsEnabled()).toBe(false);
+    component.mcpCvEnabled.set(false);
+    component.mcpMaterialsEnabled.set(true);
+    await component.saveMcpPreferences();
+    expect(pocketBaseService.saveCurrentUserMcpPreferences).toHaveBeenCalledWith({ mcpCvEnabled: false, mcpMaterialsEnabled: true });
+    expect(component.mcpSaved()).toBe(true);
+  });
+
+  it('reports an MCP save failure', async () => {
+    pocketBaseService.saveCurrentUserMcpPreferences.mockRejectedValueOnce(new Error('Save failed'));
+    await component.saveMcpPreferences();
+    expect(component.mcpSaved()).toBe(false);
+    expect(component.mcpError()).toContain('Save failed');
   });
 
   describe('changePassword', () => {

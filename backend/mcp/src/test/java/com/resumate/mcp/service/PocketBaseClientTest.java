@@ -62,6 +62,49 @@ class PocketBaseClientTest {
     }
 
     @Test
+    void mcpPreferencesReadAuthenticatedUser() throws InterruptedException {
+        enqueueAuthResponse();
+        enqueueJsonResponse("{\"id\":\"owner\",\"mcpCvEnabled\":false,\"mcpMaterialsEnabled\":true}");
+        assertThat(client.mcpPreferences("owner")).containsEntry("mcpMaterialsEnabled", true);
+        mockWebServer.takeRequest(); // service authentication
+        assertThat(mockWebServer.takeRequest().getPath()).isEqualTo("/api/collections/users/records/owner");
+    }
+
+    @Test
+    void materialCreateDerivesOwnerFromCaller() throws InterruptedException {
+        enqueueAuthResponse();
+        enqueueJsonResponse("{\"id\":\"project-1\",\"user\":\"owner\"}");
+        assertThat(client.createMaterial("projects", "owner", Map.of("name", "Built a platform")))
+                .containsEntry("id", "project-1");
+        mockWebServer.takeRequest();
+        RecordedRequest create = mockWebServer.takeRequest();
+        assertThat(create.getPath()).isEqualTo("/api/collections/projects/records");
+        assertThat(create.getBody().readUtf8()).contains("\"user\":\"owner\"");
+    }
+
+    @Test
+    void materialUpdateRejectsForeignRecordBeforePatch() throws InterruptedException {
+        enqueueAuthResponse();
+        enqueueJsonResponse("{\"id\":\"project-1\",\"user\":\"another-user\"}");
+        assertThatThrownBy(() -> client.updateMaterial("projects", "owner", "project-1", Map.of("name", "changed")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("do not belong");
+        mockWebServer.takeRequest();
+        assertThat(mockWebServer.takeRequest().getMethod()).isEqualTo("GET");
+        assertThat(mockWebServer.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
+    void materialCreateRejectsForeignRelationsAndOwnerOverride() throws InterruptedException {
+        enqueueAuthResponse();
+        enqueueJsonResponse("{\"id\":\"skill-1\",\"user\":\"another-user\"}");
+        assertThatThrownBy(() -> client.createMaterial("jobs", "owner", Map.of("label", "Engineer", "skills", List.of("skill-1"))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> client.createMaterial("skills", "owner", Map.of("name", "Java", "user", "another-user")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(mockWebServer.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
     void resolveAvailableTemplates_returnsAllTemplates() {
         List<TemplateDescriptor> result = client.resolveAvailableTemplates();
 

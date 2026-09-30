@@ -20,6 +20,14 @@
       </label>
 
       <label class="field mcp-helper__field">
+        <span>Familles d'outils pour ce client</span>
+        <select [ngModel]="selectedFamilies()" (ngModelChange)="selectedFamilies.set($event)">
+          <option value="both">CV et matériaux</option><option value="cv">CV uniquement</option><option value="materials">Matériaux uniquement</option>
+        </select>
+        <small>Ce choix ne peut pas activer une famille désactivée dans votre compte. Sans header personnalisé (certains clients OAuth), les préférences du compte s'appliquent.</small>
+      </label>
+
+      <label class="field mcp-helper__field">
         <span>Token MCP</span>
         <input [ngModel]="customToken()" (ngModelChange)="customToken.set($event)" type="text" placeholder="rmcp_..." />
         <small>Utilise uniquement la methode cle API. Les clients OAuth n'ont pas besoin de coller ce secret.</small>

@@ -49,7 +49,7 @@ export type SaveCurrentUserDegreeInput = Pick<Degree, 'title'> & Partial<Pick<De
 export type SaveCurrentUserHobbyInput = Pick<Hobby, 'name'> & Partial<Pick<Hobby, 'description' | 'sortOrder'>>;
 export type SaveCurrentUserFileInput = Partial<Pick<MediaFile, 'name' | 'alt' | 'kind' | 'sortOrder'>> & { file?: File | null };
 export type UpdateCurrentUserInput = Partial<
-  Pick<User, 'firstName' | 'lastName' | 'linkedin' | 'github' | 'website' | 'phone'>
+  Pick<User, 'firstName' | 'lastName' | 'linkedin' | 'github' | 'website' | 'phone' | 'mcpCvEnabled' | 'mcpMaterialsEnabled'>
 >;
 
 @Injectable({ providedIn: 'root' })
@@ -502,6 +502,14 @@ export class PocketBaseService {
     const updated = await this.pb.collection<User>('users').update(currentUserId, input);
     await this.prepareFileToken();
     return this.normalizeUser(updated) as User;
+  }
+
+  async getCurrentUserMcpPreferences(): Promise<Pick<User, 'mcpCvEnabled' | 'mcpMaterialsEnabled'>> {
+    return this.pb.collection<User>('users').getOne(this.requireCurrentUserId());
+  }
+
+  async saveCurrentUserMcpPreferences(input: Required<Pick<User, 'mcpCvEnabled' | 'mcpMaterialsEnabled'>>): Promise<void> {
+    await this.pb.collection<User>('users').update(this.requireCurrentUserId(), input);
   }
 
   async getCurrentProfileMetadata(): Promise<ProfileMetadata | null> {

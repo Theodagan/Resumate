@@ -8,7 +8,7 @@ interface AgentPreset {
   name: string;
   description: string;
   configFormat: 'json' | 'yaml' | 'flat';
-  configTemplate: (url: string, token: string) => string;
+  configTemplate: (url: string, token: string, families: string) => string;
 }
 
 interface CustomClientField {
@@ -23,11 +23,11 @@ const AGENT_PRESETS: AgentPreset[] = [
     name: 'Claude Code',
     description: 'Config locale par cle API pour Claude Code via mcp-remote.',
     configFormat: 'json',
-    configTemplate: (url, token) => `{
+    configTemplate: (url, token, families) => `{
   "mcpServers": {
     "resumate": {
       "command": "npx",
-      "args": ["mcp-remote", "${url}"],
+      "args": ["mcp-remote", "${url}", "--header", "Resumate-Tool-Families: ${families}"],
       "env": {
         "AUTHORIZATION": "Bearer ${token}"
       }
@@ -40,7 +40,7 @@ const AGENT_PRESETS: AgentPreset[] = [
     name: 'Codex',
     description: 'Serveur HTTP Stream avec cle API dans le header Authorization.',
     configFormat: 'json',
-    configTemplate: (url, token) => `{
+    configTemplate: (url, token, families) => `{
   "mcp": {
     "servers": [
       {
@@ -48,7 +48,8 @@ const AGENT_PRESETS: AgentPreset[] = [
         "transport": "http",
         "url": "${url}",
         "headers": {
-          "Authorization": "Bearer ${token}"
+           "Authorization": "Bearer ${token}",
+           "Resumate-Tool-Families": "${families}"
         }
       }
     ]
@@ -60,7 +61,7 @@ const AGENT_PRESETS: AgentPreset[] = [
     name: 'OpenCode',
     description: 'Configuration par cle API pour OpenCode (header API_KEY).',
     configFormat: 'json',
-    configTemplate: (url, token) => `{
+    configTemplate: (url, token, families) => `{
   "mcp": {
     "resumate": {
       "type": "remote",
@@ -68,7 +69,8 @@ const AGENT_PRESETS: AgentPreset[] = [
       "oauth": false,
       "enabled": true,
       "headers": {
-        "API_KEY": "${token}"
+         "API_KEY": "${token}",
+         "Resumate-Tool-Families": "${families}"
       }
     }
   }
@@ -79,11 +81,11 @@ const AGENT_PRESETS: AgentPreset[] = [
     name: 'Claude Desktop',
     description: 'Config par cle API pour Claude Desktop App (format mcp-remote).',
     configFormat: 'json',
-    configTemplate: (url, token) => `{
+    configTemplate: (url, token, families) => `{
   "mcpServers": {
     "resumate": {
       "command": "npx",
-      "args": ["mcp-remote", "${url}"],
+      "args": ["mcp-remote", "${url}", "--header", "Resumate-Tool-Families: ${families}"],
       "env": {
         "AUTHORIZATION": "Bearer ${token}"
       }
@@ -96,15 +98,19 @@ const AGENT_PRESETS: AgentPreset[] = [
     name: 'Client personnalisé',
     description: 'Affichage structuré des valeurs essentielles pour un client MCP personnalisé.',
     configFormat: 'flat',
-    configTemplate: (url, token) =>
+    configTemplate: (url, token, families) =>
       `URL du serveur MCP : ${url}\n` +
       `Transport          : HTTP (Streamable)\n` +
       `Méthode auth       : Clé API\n` +
       `Header Auth        : Authorization: Bearer ${token || '<votre-cle-api>'}\n` +
       `Clé API            : ${token || '<votre-cle-api>'}\n` +
-      `Outils disponibles : list_resumes, generate_cv, get_token_status, create_token, revoke_token, list_tokens`,
+      `Header outils      : Resumate-Tool-Families: ${families}\n` +
+      `Outils            : outils CV et/ou matériaux selon les préférences du compte`,
   },
 ];
+
+const CV_TOOLS = 'listTemplates, whoAmI, listProfileMaterial, listCvProfiles, createTailoredCvProfile, updateCvProfile';
+const MATERIAL_TOOLS = 'create/update Project, Achievement, Skill, Job, Degree, Hobby';
 
 @Component({
   selector: 'app-mcp-config-helper',
@@ -119,6 +125,7 @@ export class McpConfigHelper {
   readonly sourceLabel = input<string | undefined>(undefined);
   readonly agentPresets = AGENT_PRESETS;
   readonly selectedAgent = signal<string>(AGENT_PRESETS[0]?.id ?? '');
+  readonly selectedFamilies = signal<'both' | 'cv' | 'materials'>('both');
   readonly customToken = signal('');
   private readonly defaultMcpUrl = computed(() => this.mcpEndpointUrl());
   readonly customUrl = signal(this.mcpEndpointUrl());
@@ -181,7 +188,7 @@ export class McpConfigHelper {
     if (!preset) {
       return '';
     }
-    return preset.configTemplate(this.customUrl(), this.customToken() || 'votre-token-ici');
+    return preset.configTemplate(this.customUrl(), this.customToken() || 'votre-token-ici', this.selectedFamilies());
   }
 
   async copyConfig(): Promise<void> {
@@ -216,7 +223,11 @@ export class McpConfigHelper {
       { key: "Méthode d'authentification", value: 'Clé API', copyable: false },
       { key: "Header d'autorisation", value: authHeader, copyable: true },
       { key: 'Clé API', value: token, copyable: true },
-      { key: 'Outils disponibles', value: 'list_resumes, generate_cv, get_token_status, create_token, revoke_token, list_tokens', copyable: false },
+      { key: 'Header outils', value: `Resumate-Tool-Families: ${this.selectedFamilies()}`, copyable: true },
+      { key: 'Outils disponibles', value: [
+        ...(this.selectedFamilies() === 'materials' ? [] : [CV_TOOLS]),
+        ...(this.selectedFamilies() === 'cv' ? [] : [MATERIAL_TOOLS]),
+      ].join(' ; ') + ' (sous réserve des préférences du compte)', copyable: false },
     ];
   }
 

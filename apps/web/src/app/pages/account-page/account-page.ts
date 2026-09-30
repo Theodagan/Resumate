@@ -18,6 +18,11 @@ export class AccountPage implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   readonly currentUser = this.authService.currentUser;
+  readonly mcpCvEnabled = signal(true);
+  readonly mcpMaterialsEnabled = signal(false);
+  readonly mcpSaving = signal(false);
+  readonly mcpError = signal<string | null>(null);
+  readonly mcpSaved = signal(false);
 
   readonly writingStyleDescription = signal<string>('');
   readonly writingStyleUrl = signal<string>('');
@@ -42,6 +47,34 @@ export class AccountPage implements OnInit {
 
   ngOnInit(): void {
     void this.loadWritingStyleFields();
+    void this.loadMcpPreferences();
+  }
+
+  private async loadMcpPreferences(): Promise<void> {
+    try {
+      const user = await this.pocketBaseService.getCurrentUserMcpPreferences();
+      this.mcpCvEnabled.set(user.mcpCvEnabled !== false);
+      this.mcpMaterialsEnabled.set(user.mcpMaterialsEnabled === true);
+    } catch (error: unknown) {
+      this.mcpError.set(getErrorMessage(error));
+    }
+  }
+
+  async saveMcpPreferences(): Promise<void> {
+    this.mcpError.set(null);
+    this.mcpSaved.set(false);
+    this.mcpSaving.set(true);
+    try {
+      await this.pocketBaseService.saveCurrentUserMcpPreferences({
+        mcpCvEnabled: this.mcpCvEnabled(),
+        mcpMaterialsEnabled: this.mcpMaterialsEnabled(),
+      });
+      this.mcpSaved.set(true);
+    } catch (error: unknown) {
+      this.mcpError.set(getErrorMessage(error));
+    } finally {
+      this.mcpSaving.set(false);
+    }
   }
 
   private async loadWritingStyleFields(): Promise<void> {

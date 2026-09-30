@@ -266,7 +266,7 @@ Description rapide :
 - `FRONTEND_BASE_URL` : URL publique du frontend, utilisée notamment par le MCP
 - `POCKETBASE_SERVICE_USER_EMAIL` : compte de service utilisé par le serveur MCP
 - `POCKETBASE_SERVICE_USER_PASSWORD` : mot de passe du compte de service MCP
-- `MCP_PUBLIC_BASE_URL` : URL HTTPS publique du serveur MCP séparé, sans le suffixe `/mcp`
+- `MCP_PUBLIC_BASE_URL` : origine HTTPS publique du serveur MCP commun aux deux familles, sans port interne ni suffixe `/mcp`
 - `MCP_OAUTH_JWK` : clé privée RSA JWK utilisée pour signer les tokens OAuth MCP
 - `RESUMATE_AI_TOKEN` : jeton éventuel utilisé dans certains flux d'intégration
 
@@ -334,11 +334,22 @@ bun run test:all
 cd apps/web && npm run build
 ```
 
-La suite couvre les tests unitaires Angular, les tests desktop, les tests MCP et les tests Material MCP. Les workflows GitHub exécutent les contrôles frontend, desktop et MCP sur chaque pull request vers `dev` ou `main`.
+La suite couvre les tests unitaires Angular, les tests desktop et les deux familles d'outils du serveur MCP unique. Les workflows GitHub exécutent les contrôles frontend, desktop et MCP sur chaque pull request vers `dev` ou `main`.
 
 Pour l'hébergement, configurez des valeurs uniques et secrètes pour `PB_ADMIN_PASSWORD`, `POCKETBASE_SERVICE_USER_PASSWORD` et `MCP_OAUTH_JWK`; ne publiez que le frontend et, si nécessaire, le MCP derrière HTTPS. PocketBase reste interne au réseau Docker par défaut.
 
 ### Déploiement Coolify (Docker Compose)
+
+Le service `mcp` fournit **les deux familles d'outils sur le même endpoint** `https://<domaine-mcp>/mcp` : création/mise à jour de CV, et création/mise à jour de projets, réalisations, compétences, emplois, diplômes et loisirs. Aucun second domaine ni service « material-mcp » n'est nécessaire. L'authentification existante (clé API ou OAuth) sert aux deux familles.
+
+Configuration Coolify de la stack `docker/docker-compose.yml` :
+
+1. Pointez les enregistrements DNS des deux noms d'hôte vers votre instance Coolify. Affectez au service **frontend** le domaine `https://resumate.oai-lab.dev` sur le port **conteneur 80**. Affectez au service **mcp** un domaine HTTPS de votre choix (par exemple `https://mcp.resumate.oai-lab.dev`) sur le port **conteneur 8081**. Dans le champ domaine Coolify, `https://mcp.resumate.oai-lab.dev:8081` désigne le port interne de routage ; les clients se connectent à `https://mcp.resumate.oai-lab.dev/mcp`, sans `:8081`. L'exemple de sous-domaine MCP exige un DNS réellement configuré.
+2. Définissez `FRONTEND_BASE_URL=https://resumate.oai-lab.dev` et `MCP_PUBLIC_BASE_URL=https://<domaine-mcp>` dans les variables d'environnement Coolify. **N'ajoutez ni `:8081` ni `/mcp` à `MCP_PUBLIC_BASE_URL`.** Gardez `MCP_INTERNAL_PORT=8081` (ou adaptez à la fois le port interne et la route). Fournissez `MCP_OAUTH_JWK` (JWK RSA privée), `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD`, `POCKETBASE_SERVICE_USER_EMAIL` et `POCKETBASE_SERVICE_USER_PASSWORD` ; les secrets doivent être conservés côté Coolify. Le compte de service doit exister dans PocketBase et porter `isMcpServiceAccount=true` (voir `make ensure-mcp-service-user`).
+3. Déployez d'abord les migrations et hooks PocketBase avec la version du dépôt, puis le serveur MCP et le frontend. La migration ajoute les préférences par compte et autorise les écritures de matériaux du compte de service ; le frontend permet ensuite d'activer la famille « matériaux » depuis **Compte → Accès aux outils MCP**. PocketBase n'a pas de domaine Coolify propre : `https://resumate.oai-lab.dev/_/` reste accessible par le proxy frontend avec le mot de passe administrateur.
+4. Vérifiez l'URL frontend et `https://<domaine-mcp>/mcp` depuis un client externe ; `tools/list` sans authentification doit demander une authentification, une clé valide doit voir les outils CV par défaut, puis les outils de matériaux après activation. Contrôlez aussi la découverte OAuth, un CV public téléchargeable avec ses images, et le refus des fichiers privés sans authentification.
+
+Chaque compte contrôle ses deux familles dans **Compte → Accès aux outils MCP**. Par défaut, les CV sont activés et les écritures de matériaux sont désactivées ; activer la seconde famille est explicite. Un client compatible avec les headers personnalisés peut restreindre ses outils avec `Resumate-Tool-Families: cv`, `materials` ou `both` (header absent = préférences du compte). Ce header ne peut jamais activer une famille bloquée par le compte. Les clients OAuth sans headers personnalisés utilisent les préférences du compte. Toute écriture de matériau nécessite `userConfirmed=true` après accord explicite de l'utilisateur ; ce paramètre fourni par l'agent ne constitue pas une preuve indépendante de consentement. Seuls les enregistrements appartenant au compte peuvent être modifiés ou reliés.
 
 - Configurez les domaines HTTPS Coolify sur les **ports des conteneurs** : frontend `80`, MCP `${MCP_INTERNAL_PORT:-8081}`. PocketBase reste accessible uniquement aux autres conteneurs, sans domaine ni port hôte public. Vérifiez les routes réellement générées par Coolify avant de modifier les ports ; n'activez pas d'override Compose de développement ou une route « raw » vers les ports hôte.
 - Les ports hôte `${FRONTEND_PORT:-4200}` et `${MCP_PORT:-8081}` sont liés à `127.0.0.1`. Confirmez la configuration effective sans afficher les variables secrètes :
@@ -353,7 +364,7 @@ Pour l'hébergement, configurez des valeurs uniques et secrètes pour `PB_ADMIN_
 
 **Avant déploiement :** vérifiez la version PocketBase utilisée par l'image (actuellement `latest`) avec le hook `onFileDownloadRequest` et la validation des jetons ; faites une sauvegarde de `backend/pocketbase/pb_data` et préparez un retour à l'image/hooks précédents. Testez d'abord sur une instance isolée migrée avec `bash scripts/mcp-pocketbase-smoke.sh` (utilisez `CHECK_FILE_TOKEN_EXPIRY=1` pour vérifier aussi l'expiration selon la durée configurée par PocketBase). N'utilisez pas l'instance de production pour ce test : il crée temporairement comptes, CV et fichiers.
 
-**Après déploiement :** depuis une autre machine, confirmez que les ports IP du serveur (`4200`/`8081` ou ceux configurés) ne répondent pas. Sur les domaines HTTPS, vérifiez `/api/health`, la connexion de l'utilisateur, un CV public avec ses images, le refus d'un CV privé sans connexion, le comportement d'authentification `/mcp` et de découverte OAuth, et la connexion administrateur via `/_/`. Vérifiez qu'une URL de document privé connue renvoie `404` sans connexion, qu'une image publiée répond `200` sans connexion et que le propriétaire peut toujours afficher une image privée dans l'éditeur. Les règles ne retirent pas les copies de fichiers qui auraient déjà été téléchargées avant ce changement.
+**Après déploiement :** depuis une autre machine, confirmez que les ports IP du serveur (`4200`/`8081` ou ceux configurés) ne répondent pas. Sur les domaines HTTPS, vérifiez `/api/health`, la connexion de l'utilisateur, un CV public avec ses images, le refus d'un CV privé sans connexion, le comportement d'authentification `/mcp` et de découverte OAuth, et la connexion administrateur via `/_/`. Sous clé API et OAuth, vérifiez `tools/list` avec les préférences CV seules, matériaux seuls et les deux ; un appel direct à un outil désactivé doit échouer. Vérifiez qu'une URL de document privé connue renvoie `404` sans connexion, qu'une image publiée répond `200` sans connexion et que le propriétaire peut toujours afficher une image privée dans l'éditeur. Les règles ne retirent pas les copies de fichiers qui auraient déjà été téléchargées avant ce changement.
 
 ### Templates CV
 
@@ -408,7 +419,7 @@ bash .devcontainer/setup.sh
 
 ## MCP et intégration IA
 
-Le dépôt inclut un serveur MCP local qui permet à un agent compatible de travailler sur les données CV d'un utilisateur sans exposer directement ses identifiants PocketBase.
+Le dépôt inclut un serveur MCP (local ou public) qui permet à un agent compatible de travailler sur les données CV d'un utilisateur sans exposer directement ses identifiants PocketBase.
 
 Le service MCP permet notamment de :
 
@@ -416,6 +427,7 @@ Le service MCP permet notamment de :
 - lister les templates disponibles
 - récupérer les matériaux réutilisables d'un profil : expériences, projets, compétences, diplômes, hobbies, réalisations
 - créer un profil CV public personnalisé pour une offre donnée
+- créer et mettre à jour des projets, réalisations, compétences, emplois, diplômes et loisirs authentiques après activation de la famille « matériaux »
 
 ### Première configuration locale du MCP
 
@@ -439,6 +451,33 @@ Ensuite :
 4. Injectez cette clé dans votre configuration locale d'agent si nécessaire.
 
 Le fichier `opencode.json` du projet pointe vers l'endpoint MCP local par défaut. Si vous changez `MCP_PORT`, adaptez aussi cette URL dans votre configuration d'agent locale. En déploiement public, utilisez `${MCP_PUBLIC_BASE_URL}/mcp` comme valeur cible.
+
+### Brancher un client MCP
+
+1. Connectez-vous au frontend ; dans **Compte → Accès aux outils MCP**, activez indépendamment « CV » et « Matériaux ». Par défaut, seuls les outils CV sont actifs. L'activation du compte fixe la limite pour **toutes** ses clés et connexions OAuth.
+2. Dans **Gestion des tokens MCP**, créez une clé API et ouvrez l'assistant de configuration. Sélectionnez Claude Code, Claude Desktop, Codex, OpenCode ou un client personnalisé ; choisissez « CV et matériaux », « CV uniquement » ou « Matériaux uniquement », puis copiez la configuration générée dans votre client. La clé n'est montrée qu'à la création : conservez-la dans votre gestionnaire de secrets. Un client OAuth (par exemple une connexion directe Claude) peut utiliser simplement `https://<domaine-mcp>/mcp` et son flux OAuth, sans clé API à coller.
+3. Les clients HTTP qui acceptent des headers personnalisés utilisent l'URL `https://<domaine-mcp>/mcp`, une authentification (`Authorization: Bearer <clé-api>` **ou** `API_KEY: <clé-api>`) et, si vous souhaitez réduire les outils visibles, `Resumate-Tool-Families: cv`, `materials` ou `both`. Sans ce dernier header, les préférences du compte s'appliquent ; il ne peut jamais réactiver une famille désactivée. Certains clients OAuth ne permettent aucun header personnalisé : réglez leur visibilité depuis le compte.
+
+Exemple OpenCode avec clé API (même URL pour les deux familles) :
+
+```json
+{
+  "mcp": {
+    "resumate": {
+      "type": "remote",
+      "url": "https://<domaine-mcp>/mcp",
+      "oauth": false,
+      "enabled": true,
+      "headers": {
+        "API_KEY": "<clé-api>",
+        "Resumate-Tool-Families": "materials"
+      }
+    }
+  }
+}
+```
+
+Remplacez `materials` par `cv` pour ce client, ou par `both` pour exposer les deux familles autorisées par le compte. Une écriture de matériau exige `userConfirmed=true` après votre accord explicite sur l'opération ; ce booléen fourni par l'agent ne prouve pas indépendamment cet accord. Les CV créés par MCP restent publics et leurs liens de téléchargement et images publiques restent accessibles sans connexion.
 
 ## Données de démonstration
 

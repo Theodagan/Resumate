@@ -9,4 +9,6 @@ export interface User {
   phone?: string;
   profilePicture?: string;
   coverPicture?: string;
+  mcpCvEnabled?: boolean;
+  mcpMaterialsEnabled?: boolean;
 }
