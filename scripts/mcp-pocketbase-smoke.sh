@@ -37,6 +37,7 @@ private_image_id=""
 public_image_id=""
 project_id=""
 skill_id=""
+service_material_id=""
 
 cleanup() {
   local token
@@ -54,6 +55,9 @@ cleanup() {
   fi
   if [ -n "$skill_id" ]; then
     pb_delete_record "$token" skills "$skill_id" 2>/dev/null || true
+  fi
+  if [ -n "$service_material_id" ]; then
+    pb_delete_record "$token" skills "$service_material_id" 2>/dev/null || true
   fi
 
   for file_id in "$document_id" "$private_image_id" "$public_image_id"; do
@@ -149,12 +153,43 @@ metadata_id="$(printf '%s' "$metadata_response" | jq -r '.id // empty')"
 service_metadata_status="$(curl -sS -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer $service_token" \
   "$PB_URL/api/collections/profile_metadata/records/$metadata_id")"
-service_user_status="$(curl -sS -o /dev/null -w '%{http_code}' \
-  -H "Authorization: Bearer $service_token" \
+service_user_response="$(curl -fsS -H "Authorization: Bearer $service_token" \
   "$PB_URL/api/collections/users/records/$owner_id")"
 
-if [ "$service_metadata_status" != "404" ] || [ "$service_user_status" != "404" ]; then
-  echo "MCP service account unexpectedly accessed owner metadata or user records." >&2
+if [ "$service_metadata_status" != "404" ] || ! printf '%s' "$service_user_response" | jq -e \
+  --arg id "$owner_id" '.id == $id and .mcpCvEnabled == true and .mcpMaterialsEnabled == false' >/dev/null; then
+  echo "MCP service account must read the owner preferences but not private profile metadata." >&2
+  echo "metadata_status=$service_metadata_status preferences=$(printf '%s' "$service_user_response" | jq -c '{mcpCvEnabled, mcpMaterialsEnabled}')" >&2
+  exit 1
+fi
+
+# Preferences are owner-controlled and take effect for an existing service login.
+owner_preferences="$(curl -fsS -X PATCH "$PB_URL/api/collections/users/records/$owner_id" \
+  -H "Authorization: Bearer $owner_token" -H 'Content-Type: application/json' \
+  --data '{"mcpCvEnabled":false,"mcpMaterialsEnabled":true}')"
+if ! printf '%s' "$owner_preferences" | jq -e '.mcpCvEnabled == false and .mcpMaterialsEnabled == true' >/dev/null || \
+   ! curl -fsS -H "Authorization: Bearer $service_token" \
+     "$PB_URL/api/collections/users/records/$owner_id" | jq -e \
+     '.mcpCvEnabled == false and .mcpMaterialsEnabled == true' >/dev/null; then
+  echo 'MCP preference updates were not visible to the service account.' >&2
+  exit 1
+fi
+
+service_material_response="$(curl -fsS -X POST "$PB_URL/api/collections/skills/records" \
+  -H "Authorization: Bearer $service_token" -H 'Content-Type: application/json' \
+  --data "$(jq -cn --arg user "$owner_id" '{user:$user,name:"Service smoke skill"}')")"
+service_material_id="$(printf '%s' "$service_material_response" | jq -r '.id // empty')"
+if [ -z "$service_material_id" ] || \
+   [ "$(printf '%s' "$service_material_response" | jq -r '.user')" != "$owner_id" ]; then
+  echo 'MCP service material creation did not preserve the requested owner.' >&2
+  exit 1
+fi
+service_material_patch="$(curl -fsS -X PATCH "$PB_URL/api/collections/skills/records/$service_material_id" \
+  -H "Authorization: Bearer $service_token" -H 'Content-Type: application/json' \
+  --data '{"name":"Updated service smoke skill"}')"
+if ! printf '%s' "$service_material_patch" | jq -e \
+  --arg owner "$owner_id" '.name == "Updated service smoke skill" and .user == $owner' >/dev/null; then
+  echo 'MCP service material update failed.' >&2
   exit 1
 fi
 

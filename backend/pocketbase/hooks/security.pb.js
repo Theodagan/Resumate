@@ -3,10 +3,6 @@
 // isMcpServiceAccount=true and match every service-account clause in the API rules.
 // Handlers run in isolated JSVM contexts, so the field list is declared inline.
 onRecordCreateRequest((e) => {
-  if (e.hasSuperuserAuth()) {
-    return e.next();
-  }
-
   const record = e.record;
   if (!record) {
     throw new BadRequestError('User record is missing.');
@@ -16,6 +12,9 @@ onRecordCreateRequest((e) => {
   if (collection.fields.getByName('mcpCvEnabled')) {
     // New accounts retain the pre-existing CV MCP access by default.
     record.set('mcpCvEnabled', true);
+  }
+  if (e.hasSuperuserAuth()) {
+    return e.next();
   }
   for (const fieldName of ['isMcpServiceAccount', 'bypassBilling', 'subscriptionStatus', 'stripeCustomerId', 'stripeSubscriptionId']) {
     if (!collection.fields.getByName(fieldName)) continue;
