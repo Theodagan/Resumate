@@ -127,6 +127,38 @@ describe('ProfileEditorPage', () => {
     expect(component.getExtraStringArrayValue(component.editorState()!, sourceField)).toEqual(['project-2']);
   });
 
+  it('persists html and rich-text extras through the shared extra bucket', () => {
+    const htmlField = { id: 'backPageHtml', label: 'Verso', type: 'html' } as never;
+    const richTextField = { id: 'fitRichText', label: 'Pourquoi moi', type: 'richtext' } as never;
+
+    component.setExtraValue(htmlField, '<section class="atelier">Atelier</section>');
+    expect(component.getExtraTextValue(component.editorState()!, htmlField)).toBe('<section class="atelier">Atelier</section>');
+
+    component.setExtraRichTextValue(richTextField, '<p>Je <strong>documente</strong>.</p>');
+    expect(component.getExtraTextValue(component.editorState()!, richTextField)).toBe('<p>Je <strong>documente</strong>.</p>');
+
+    // A pull quote is legitimate rich text: the summary-only quote stripping must not touch it.
+    component.setExtraRichTextValue(richTextField, '<p>"Livré en 3 semaines"</p>');
+    expect(component.getExtraTextValue(component.editorState()!, richTextField)).toBe('<p>"Livré en 3 semaines"</p>');
+    component.setProfessionalSummary('<p>"Livré en 3 semaines"</p>');
+    expect(component.editorState()?.profile.professionalSummary).toBe('<p>Livré en 3 semaines</p>');
+
+    // An emptied Quill instance must not persist its placeholder markup.
+    component.setExtraRichTextValue(richTextField, '<p><br></p>');
+    expect(component.getExtraTextValue(component.editorState()!, richTextField)).toBe('');
+    component.setExtraRichTextValue(richTextField, '');
+    expect(component.getExtraTextValue(component.editorState()!, richTextField)).toBe('');
+
+    // Both extras live in the selected template bucket alongside the pre-existing ones.
+    expect(component.editorState()?.profile.extra?.['classic']).toEqual({
+      hero: 'Existing hero',
+      visible: true,
+      featuredProjects: ['project-1'],
+      backPageHtml: '<section class="atelier">Atelier</section>',
+      fitRichText: '',
+    });
+  });
+
   it('updates profile summary, link overrides and status', () => {
     component.setProfessionalSummary('Summary');
     component.setLinkOverrideField('github', 'https://github.test/me');

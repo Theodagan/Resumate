@@ -1,7 +1,8 @@
-import { ChangeDetectorRef } from '@angular/core';
+import { ChangeDetectorRef, ElementRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { CvProfileExtraService } from '../../core/services/cv-profile-extra.service';
 import { PocketBaseService } from '../../core/services/pocketbase.service';
+import { AfficheCvPage } from './affiche-cv-page/affiche-cv-page';
 import { BentoCvPage } from './bento-cv-page/bento-cv-page';
 import { MinimalCvPage } from './minimal-cv-page/minimal-cv-page';
 import { ModernCvPage } from './modern-cv-page/modern-cv-page';
@@ -26,11 +27,12 @@ describe('CV template page logic', () => {
     jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
 
     TestBed.configureTestingModule({
-      imports: [MinimalCvPage, ModernCvPage, SupaCVPage, BentoCvPage],
+      imports: [MinimalCvPage, ModernCvPage, SupaCVPage, BentoCvPage, AfficheCvPage],
       providers: [
         CvProfileExtraService,
         { provide: PocketBaseService, useValue: pocketBaseService },
         { provide: ChangeDetectorRef, useValue: { detectChanges: jest.fn(), markForCheck: jest.fn() } },
+        { provide: ElementRef, useValue: new ElementRef(document.createElement('div')) },
       ],
     });
   });
@@ -207,9 +209,127 @@ describe('CV template page logic', () => {
     expect(api['isJobDescriptionVisible']({ id: 'job-1' })).toBe(false);
   });
 
+  it('covers affiche template mapping helpers and load states', async () => {
+    const component = TestBed.runInInjectionContext(() => new AfficheCvPage());
+    component.cvData.set(cvData() as never);
+    const api = component as never as Record<string, (...args: unknown[]) => unknown>;
+    const data = cvData() as never as {
+      profile: { slug: string; profileName: string; extra: Record<string, Record<string, unknown>> };
+      user: { website?: string } | null;
+      jobs: unknown[];
+      projects: unknown[];
+      skills: unknown[];
+    };
+
+    // Identity, role and status pill.
+    expect(api['getDisplayName'](data)).toBe('Jane Doe');
+    expect(api['getDisplayName']({ ...data, user: null })).toBe('Senior Engineer / Architect');
+    expect(api['getDisplayName']({ ...data, user: null, profile: { ...data.profile, profileName: '' } })).toBe('Curriculum Vitae');
+    expect(api['getRole'](data)).toBe('Senior Engineer / Architect');
+    expect(api['getStatus'](data)).toBe('Disponible');
+    expect(api['getStatus']({ ...data, profile: { ...data.profile, extra: { affiche: { availability: ' Disponible · Rennes ' } } } })).toBe('Disponible · Rennes');
+    expect(api['getStatus']({ ...data, profile: { ...data.profile, template: 'affiche', extra: { affiche: { availability: 42 } } } })).toBe('Disponible');
+
+    // Intro and skills / languages split.
+    expect(api['getIntro'](data)).toBe('');
+    expect(api['getIntro']({ ...data, profile: { ...data.profile, professionalSummary: '<p>Je <b>construis</b> &amp; documente.</p>' } })).toBe('Je construis & documente.');
+    expect((api['getSkillChips'](data.skills) as { id: string }[]).map((skill) => skill.id)).toEqual(['skill-1', 'skill-2']);
+    expect(api['getLanguages'](data.skills)).toBe('English');
+    expect(api['getLanguages']([])).toBe('');
+
+    // Parcours: most recent first, freelance missions extracted.
+    expect((api['getSortedJobs'](data.jobs) as { id: string }[]).map((job) => job.id)).toEqual(['job-2', 'job-1']);
+    // The timeline drops freelance work: it already has its own list right below.
+    expect((api['getTimelineJobs'](data.jobs) as { id: string }[]).map((job) => job.id)).toEqual(['job-1']);
+    expect(api['getTimelineJobs']([{ id: 'job-3', type: 'freelance' }])).toEqual([]);
+    expect(api['getJobDateRange']({ startDate: '2020-01-01', endDate: '2022-01-01' })).toContain('—');
+    expect(api['getJobDateRange']({ startDate: null, endDate: null })).toBe("Début — Aujourd'hui");
+    const missions = api['getFreelanceMissions'](data.jobs) as { id: string; year: string; label: string }[];
+    expect(missions).toHaveLength(1);
+    expect(missions[0].id).toBe('job-2');
+    expect(missions[0].year).toMatch(/^\d{4}$/);
+    expect(missions[0].label).toBe('Lead · Globex');
+
+    // Projets: first project is the hero, the rest become numbered rows (capped at 4).
+    expect((api['getHeroProject'](data.projects) as { id: string }).id).toBe('project-1');
+    expect(api['getHeroProject']([])).toBeNull();
+    expect(api['getProjectRows'](data.projects)).toHaveLength(0);
+    const manyProjects = Array.from({ length: 8 }, (_, index) => ({ id: `p-${index}`, name: `P${index}` }));
+    expect(api['getProjectRows'](manyProjects)).toHaveLength(4);
+    expect(api['getProjectIndex'](0)).toBe('02');
+    expect(api['getProjectIndex'](2)).toBe('04');
+    expect(api['getProjectImage'](data.projects[0])).toBeNull();
+    expect(api['getProjectImage']({ picture: 'https://cdn.test/a.png' })).toBe('https://cdn.test/a.png');
+    expect(api['getProjectImage']({ expand: { file: { file: 'https://cdn.test/b.png' } } })).toBe('https://cdn.test/b.png');
+    expect(api['getProjectMeta'](data.projects[0])).toMatch(/^\d{4}$/);
+
+    // Univers: only projects carrying an image, first one featured.
+    expect(api['getGalleryItems'](data.projects)).toHaveLength(0);
+    const gallery = api['getGalleryItems']([
+      { id: 'p-1', name: 'One', picture: 'https://cdn.test/1.png', description: '<p>Un</p>' },
+      { id: 'p-2', name: 'Two' },
+      { id: 'p-3', name: 'Three', expand: { file: { file: 'https://cdn.test/3.png' } } },
+      { id: 'p-4', name: 'Four', picture: 'https://cdn.test/4.png' },
+      { id: 'p-5', name: 'Five', picture: 'https://cdn.test/5.png' },
+    ]) as { id: string; caption: string }[];
+    expect(gallery.map((item) => item.id)).toEqual(['p-1', 'p-3', 'p-4']);
+    expect(gallery[0].caption).toBe('Un');
+    expect(gallery[1].caption).toBe('');
+
+    // Pourquoi moi.
+    expect(api['getFitLead'](data)).toContain("j'apporte");
+    expect(api['getFitLead']({ ...data, profile: { ...data.profile, extra: { affiche: { fitLead: 'Je reprends des socles existants.' } } } })).toBe('Je reprends des socles existants.');
+    expect(api['getMark'](0)).toBe('01');
+    expect(api['getMark'](9)).toBe('10');
+
+    // Shared formatting and profile URL.
+    expect(api['getDate']('2024-01-02')).toContain('2024');
+    expect(api['getDate']('bad-date')).toBe('');
+    expect(api['getYear']('bad-date')).toBe('');
+    expect(api['stripUrlProtocol']('https://example.test/path')).toBe('example.test/path');
+    expect(api['stripUrlProtocol'](null)).toBe('');
+    expect(api['stripHtml'](null)).toBe('');
+    expect(api['stripHtml']('&lt;a&gt; &quot;b&quot; &#39;c&#39;&nbsp;d')).toBe('<a> "b" \'c\' d');
+    expect(api['extra']('hero')).toBe('Hero text');
+    expect(api['getProfileUrl'](data)).toBe('https://jane.test');
+    expect(api['getProfileUrl']({ ...data, user: null })).toContain('/classic--profile-1');
+    expect(api['getProfileUrl']({ ...data, user: null, profile: { ...data.profile, slug: '' } })).toBeNull();
+
+    // Load states.
+    await api['loadCvData']('profile-1');
+    expect(component.cvData()?.profile.id).toBe('profile-1');
+    expect(component.isLoading()).toBe(false);
+
+    pocketBaseService.getCvDataByProfileId.mockRejectedValueOnce(new Error('Broken affiche'));
+    await api['loadCvData']('profile-1');
+    expect(component.errorMessage()).toBe('Broken affiche');
+  });
+
+  it('renders the affiche template from preview data and builds its QR code', async () => {
+    const fixture = TestBed.createComponent(AfficheCvPage);
+    fixture.componentRef.setInput('previewData', cvData());
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    // No `showAllPages` extra on this fixture, so the verso stays out of the render.
+    expect(host.querySelectorAll('.page')).toHaveLength(1);
+    expect(host.querySelector('.display')?.textContent?.trim()).toBe('Jane Doe');
+    // Two jobs on the fixture, one of them freelance: the timeline keeps the salaried one and the
+    // freelance one shows up once, in the missions list.
+    expect(host.querySelectorAll('.timeline-item')).toHaveLength(1);
+    expect(host.querySelector('.timeline-item h3')?.textContent?.trim()).toBe('Developer');
+    expect(host.querySelectorAll('.missions li')).toHaveLength(1);
+    expect(host.querySelector('.missions li')?.textContent).toContain('Lead · Globex');
+    expect(host.querySelector('.project-hero h3')?.textContent?.trim()).toBe('Project One');
+    expect(host.querySelector('.universe-gallery')).toBeNull();
+    expect(fixture.componentInstance.qrCodeUrl()).toBe('data:image/png;base64,qr');
+  });
+
   it('covers template pages error and previewData load paths', async () => {
     // Test loadCvData error for each template
-    const ctors = [SupaCVPage, BentoCvPage, ModernCvPage, MinimalCvPage];
+    const ctors = [SupaCVPage, BentoCvPage, ModernCvPage, MinimalCvPage, AfficheCvPage];
     for (const Ctor of ctors) {
       pocketBaseService.getCvDataByProfileId.mockRejectedValueOnce(new Error('Load error'));
       const component = TestBed.runInInjectionContext(() => new Ctor());
@@ -222,7 +342,7 @@ describe('CV template page logic', () => {
   });
 
   it('ignores stale successful template loads', async () => {
-    const ctors = [SupaCVPage, BentoCvPage, ModernCvPage, MinimalCvPage];
+    const ctors = [SupaCVPage, BentoCvPage, ModernCvPage, MinimalCvPage, AfficheCvPage];
     for (const Ctor of ctors) {
       const staleLoad = deferred<unknown>();
       const freshData = { ...(cvData() as object), profile: { ...(cvData() as never as { profile: object }).profile, id: 'profile-2' } };
@@ -244,7 +364,7 @@ describe('CV template page logic', () => {
   });
 
   it('ignores stale failed template loads', async () => {
-    const ctors = [SupaCVPage, BentoCvPage, ModernCvPage, MinimalCvPage];
+    const ctors = [SupaCVPage, BentoCvPage, ModernCvPage, MinimalCvPage, AfficheCvPage];
     for (const Ctor of ctors) {
       const staleLoad = deferred<unknown>();
       pocketBaseService.getCvDataByProfileId

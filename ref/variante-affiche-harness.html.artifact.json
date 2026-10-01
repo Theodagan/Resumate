@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "variante-affiche-harness.html",
+  "entry": "variante-affiche-harness.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-08-31T09:36:17.392Z",
+  "updatedAt": "2026-08-31T09:36:17.392Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

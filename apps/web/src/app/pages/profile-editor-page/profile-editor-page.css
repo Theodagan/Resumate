@@ -222,6 +222,17 @@
   margin-top: 18px;
 }
 
+/* --- Template extras : raw HTML source ---------------------------- */
+.field textarea.html-source {
+  font-family: var(--af-mono);
+  font-size: .82rem;
+  line-height: 1.55;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  tab-size: 2;
+}
+
 /* --- Quill : skinned with field + toolbar primitives only --------- */
 :host ::ng-deep .summary-editor {
   display: grid;

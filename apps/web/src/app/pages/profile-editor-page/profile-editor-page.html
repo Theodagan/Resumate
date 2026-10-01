@@ -446,6 +446,31 @@
                       </label>
                     }
 
+                    @case ('html') {
+                      <label class="field field--full">
+                        <span>{{ field.label }}</span>
+                        <textarea class="html-source" [ngModel]="getExtraTextValue(state, field)" (ngModelChange)="setExtraValue(field, $event)" [name]="'extra-' + field.id" rows="10" spellcheck="false"></textarea>
+                        <small class="field-hint">{{ field.description }}</small>
+                      </label>
+                    }
+
+                    @case ('richtext') {
+                      <div class="field field--full">
+                        <span>{{ field.label }}</span>
+                        <quill-editor
+                          class="summary-editor"
+                          format="html"
+                          theme="snow"
+                          [modules]="summaryEditorModules"
+                          [sanitize]="true"
+                          [ngModel]="getExtraTextValue(state, field)"
+                          (ngModelChange)="setExtraRichTextValue(field, $event ?? '')"
+                          [name]="'extra-' + field.id"
+                        />
+                        <small class="field-hint">{{ field.description }}</small>
+                      </div>
+                    }
+
                     @case ('color') {
                       <label class="field">
                         <span>{{ field.label }}</span>

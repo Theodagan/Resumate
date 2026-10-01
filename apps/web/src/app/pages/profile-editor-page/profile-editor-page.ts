@@ -348,6 +348,15 @@ export class ProfileEditorPage implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * An emptied Quill instance persists an empty string instead of its `<p><br></p>` placeholder
+   * markup. The summary-specific quote rewriting is deliberately left out: an extra may legitimately
+   * open and close on a quotation mark (pull quote), and stripping it would fight every keystroke.
+   */
+  setExtraRichTextValue(field: CvTemplateExtraField, value: string): void {
+    this.setExtraValue(field, this.normalizeRichTextHtml(value) ?? '');
+  }
+
   setProfessionalSummary(value: string): void {
     const professionalSummary = this.normalizeSummaryHtml(value);
 
@@ -366,6 +375,29 @@ export class ProfileEditorPage implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Shared rich-text normalization: drops Quill's empty-editor placeholders and any markup carrying
+   * neither text nor media, and keeps everything else verbatim.
+   */
+  private normalizeRichTextHtml(value: string | undefined): string | undefined {
+    const html = value?.trim() ?? '';
+
+    if (!html || html === '<br>') {
+      return undefined;
+    }
+
+    // Parse untrusted HTML in an inert document to avoid loading media or firing handlers.
+    const container = new DOMParser().parseFromString(html, 'text/html').body;
+    const hasMediaOrStructure = !!container.querySelector('img,video,iframe,ul,ol,li,table,hr');
+    const text = container.textContent?.replace(/\u00a0/g, ' ').trim() ?? '';
+
+    return text || hasMediaOrStructure ? html : undefined;
+  }
+
+  /**
+   * Summary-only cleanup on top of {@link normalizeRichTextHtml}: an AI-generated summary arrives
+   * JSON-quoted or wrapped in quotation marks often enough to be worth unwrapping here.
+   */
   private normalizeSummaryHtml(value: string | undefined): string | undefined {
     let html = value?.trim() ?? '';
 
@@ -390,13 +422,7 @@ export class ProfileEditorPage implements OnInit, OnDestroy {
       .replace(/^(["“”])(<[a-z][\s\S]*>)/i, '$2')
       .replace(/(<\/[a-z]+>)(["“”])$/i, '$1');
 
-    // DOMParser yields an inert document: unlike innerHTML on a live-document node,
-    // it never loads <img> sources or fires inline handlers from untrusted HTML.
-    const container = new DOMParser().parseFromString(html, 'text/html').body;
-    const hasMediaOrStructure = !!container.querySelector('img,video,iframe,ul,ol,li,table,hr');
-    const text = container.textContent?.replace(/\u00a0/g, ' ').trim() ?? '';
-
-    return text || hasMediaOrStructure ? html : undefined;
+    return this.normalizeRichTextHtml(html);
   }
 
   setLinkOverrideField(field: keyof CvProfileLinkOverrides, value: string): void {

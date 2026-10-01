@@ -17,6 +17,25 @@ describe('ThemeService', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
+  it('honours the pre-rename theme key so an existing light choice survives', () => {
+    localStorage.setItem('theme', 'light');
+
+    expect(new ThemeService().currentTheme()).toBe('light');
+  });
+
+  it('prefers the namespaced key over the legacy one', () => {
+    localStorage.setItem('theme', 'light');
+    localStorage.setItem('resumate:theme', 'dark');
+
+    expect(new ThemeService().currentTheme()).toBe('dark');
+  });
+
+  it('falls back to dark for a legacy system preference, which the theme union no longer carries', () => {
+    localStorage.setItem('theme', 'system');
+
+    expect(new ThemeService().currentTheme()).toBe('dark');
+  });
+
   it('falls back to dark for unsupported stored values', () => {
     localStorage.setItem('resumate:theme', 'neon');
 
