@@ -19,85 +19,94 @@
             <p class="eyebrow">Profil</p><span class="count">01 / 06</span>
           </div>
 
-          <h1 class="display">{{ getDisplayName(data) }}</h1>
-          @if (getRole(data)) {
-            <p class="role">{{ getRole(data) }}</p>
-          }
+          <div class="hero-presentation">
+            <section class="hero-block hero-block--identity">
+              <h1 class="display">{{ getDisplayName(data) }}</h1>
+              @if (getRole(data)) {
+                <p class="role">{{ getRole(data) }}</p>
+              }
+              <p class="status">{{ getStatus(data) }}</p>
+              @if (getIntro(data); as intro) {
+                <p class="intro">{{ intro }}</p>
+              }
+            </section>
 
-          <p class="status">{{ getStatus(data) }}</p>
-
-          @if (getIntro(data); as intro) {
-            <p class="intro">{{ intro }}</p>
-          }
-
-          @if (getSkillChips(data.skills); as skillChips) {
-            @if (skillChips.length > 0) {
-              <h2 class="panel-head">Compétences</h2>
-              <ul class="chips">
-                @for (skill of skillChips; track skill.id) {
-                  <li>{{ skill.name }}</li>
-                }
-              </ul>
-            }
-          }
-
-          @if (data.degrees.length > 0) {
-            <h2 class="panel-head">Formation</h2>
-            <ul class="edu-list">
-              @for (degree of data.degrees; track degree.id) {
-                <li>
-                  <span class="edu-year">{{ degree.year }}</span>
-                  <span>
-                    <strong>{{ degree.title }}</strong>
-                    @if (degree.school) {
-                      <span class="edu-school">{{ degree.school }}</span>
+            @if (getSkillChips(data.skills); as skillChips) {
+              @if (skillChips.length > 0) {
+                <section class="hero-block hero-block--skills">
+                  <h2 class="panel-head">Compétences</h2>
+                  <ul class="chips">
+                    @for (skill of skillChips; track skill.id) {
+                      <li>{{ skill.name }}</li>
                     }
-                  </span>
-                </li>
+                  </ul>
+                </section>
               }
-            </ul>
-          }
+            }
 
-          @if (getLanguages(data.skills); as languages) {
-            <p class="languages">{{ languages }}</p>
-          }
+            @if (data.degrees.length > 0 || getLanguages(data.skills)) {
+              <section class="hero-block hero-block--education">
+                @if (data.degrees.length > 0) {
+                  <h2 class="panel-head">Formation</h2>
+                  <ul class="edu-list">
+                    @for (degree of data.degrees; track degree.id) {
+                      <li>
+                        <span class="edu-year">{{ degree.year }}</span>
+                        <span>
+                          <strong>{{ degree.title }}</strong>
+                          @if (degree.school) {
+                            <span class="edu-school">{{ degree.school }}</span>
+                          }
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                }
+                @if (getLanguages(data.skills); as languages) {
+                  <p class="languages">{{ languages }}</p>
+                }
+              </section>
+            }
 
-          <div class="contact-block">
-            <h2 class="panel-head">Coordonnées</h2>
-            <div class="contact">
-              <ul class="links">
-                @if (data.user?.email; as email) {
-                  <li>
-                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.6" y="3.6" width="12.8" height="8.8"/><path d="M1.6 4.4 8 9l6.4-4.6"/></svg>
-                    <a [href]="'mailto:' + email">{{ email }}</a>
-                  </li>
-                }
-                @if (data.user?.github; as github) {
-                  <li>
-                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 4 2 8l3.6 4M10.4 4 14 8l-3.6 4"/></svg>
-                    <a [href]="github" target="_blank" rel="noreferrer">{{ stripUrlProtocol(github) }}</a>
-                  </li>
-                }
-                @if (data.user?.linkedin; as linkedin) {
-                  <li>
-                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.6" y="2.6" width="12.8" height="10.8"/><circle cx="5.6" cy="6.9" r="1.5"/><path d="M3 12.2c.5-1.5 1.5-2.3 2.6-2.3s2.1.8 2.6 2.3M10 6.6h3M10 9.2h3"/></svg>
-                    <a [href]="linkedin" target="_blank" rel="noreferrer">{{ stripUrlProtocol(linkedin) }}</a>
-                  </li>
-                }
-                @if (data.user?.website; as website) {
-                  <li>
-                    <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c3 3.4 3 8.9 0 12.4M8 1.8c-3 3.4-3 8.9 0 12.4"/></svg>
-                    <a [href]="website" target="_blank" rel="noreferrer">{{ stripUrlProtocol(website) }}</a>
-                  </li>
-                }
-              </ul>
-              @if (qrCodeUrl(); as qrCode) {
-                <figure class="qr">
-                  <img [src]="qrCode" alt="QR code vers le profil en ligne">
-                  <figcaption>Profil</figcaption>
-                </figure>
-              }
-            </div>
+            <section class="hero-block hero-block--contact">
+              <div class="contact-block">
+                <h2 class="panel-head">Coordonnées</h2>
+                <div class="contact">
+                  <ul class="links">
+                    @if (data.user?.email; as email) {
+                      <li>
+                        <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.6" y="3.6" width="12.8" height="8.8"/><path d="M1.6 4.4 8 9l6.4-4.6"/></svg>
+                        <a [href]="'mailto:' + email">{{ email }}</a>
+                      </li>
+                    }
+                    @if (data.user?.github; as github) {
+                      <li>
+                        <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.6 4 2 8l3.6 4M10.4 4 14 8l-3.6 4"/></svg>
+                        <a [href]="github" target="_blank" rel="noreferrer">{{ stripUrlProtocol(github) }}</a>
+                      </li>
+                    }
+                    @if (data.user?.linkedin; as linkedin) {
+                      <li>
+                        <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.6" y="2.6" width="12.8" height="10.8"/><circle cx="5.6" cy="6.9" r="1.5"/><path d="M3 12.2c.5-1.5 1.5-2.3 2.6-2.3s2.1.8 2.6 2.3M10 6.6h3M10 9.2h3"/></svg>
+                        <a [href]="linkedin" target="_blank" rel="noreferrer">{{ stripUrlProtocol(linkedin) }}</a>
+                      </li>
+                    }
+                    @if (data.user?.website; as website) {
+                      <li>
+                        <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M1.8 8h12.4M8 1.8c3 3.4 3 8.9 0 12.4M8 1.8c-3 3.4-3 8.9 0 12.4"/></svg>
+                        <a [href]="website" target="_blank" rel="noreferrer">{{ stripUrlProtocol(website) }}</a>
+                      </li>
+                    }
+                  </ul>
+                  @if (qrCodeUrl(); as qrCode) {
+                    <figure class="qr">
+                      <img [src]="qrCode" alt="QR code vers le profil en ligne">
+                      <figcaption>Profil</figcaption>
+                    </figure>
+                  }
+                </div>
+              </div>
+            </section>
           </div>
         </section>
 

@@ -92,7 +92,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 /* ---------- Feuille A4 paysage ---------------------------------- */
 .page {
-  width: min(1180px, calc(100vw - 48px));
+  width: min(1180px, calc(100% - 48px));
   aspect-ratio: 297 / 210;
   margin: 40px auto;
   padding: 2.2%;
@@ -194,7 +194,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   font: 600 .84em/1.2 var(--af-mono);
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: var(--af-mine);
+  color: var(--af-encre);
 }
 .eyebrow::before { content: ""; flex: none; width: .58em; height: .58em; border-radius: var(--af-cercle); background: currentColor; }
 .section-head .count { font: 500 .78em/1 var(--af-mono); letter-spacing: .1em; color: var(--af-mine); }
@@ -265,6 +265,22 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 .intro { margin-top: 1.1em; font-size: .98em; color: var(--af-encre); }
 
+/* Colonne de présentation du volet Profil : chaque bloc est un élément
+   propre, et l'espace vertical restant est distribué également entre eux
+   (space-between + gap plancher). Le tout vit dans un seul élément DOM. */
+.hero-presentation {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.1em;
+}
+.hero-block { min-width: 0; }
+/* L'espacement inter-blocs appartient à la distribution : aucune marge
+   haute résiduelle sur le premier enfant d'un bloc. */
+.hero-block > :first-child { margin-top: 0; }
+
 /* Compétences : aplats de champ, angles francs. */
 .chips { display: flex; flex-wrap: wrap; gap: .35em; }
 .chips li {
@@ -282,7 +298,6 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .edu-school { display: block; color: var(--af-mine); }
 .languages { margin-top: .8em; font: 500 .8em/1.4 var(--af-mono); letter-spacing: .04em; color: var(--af-mine); }
 
-.contact-block { margin-top: auto; }
 .contact { display: grid; grid-template-columns: minmax(0, 1fr) 4.2em; gap: 1em; align-items: end; }
 .links { display: grid; gap: .38em; font-size: .86em; }
 .links li { display: flex; align-items: center; gap: .5em; }
@@ -453,10 +468,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .btn-primary:hover { box-shadow: 5px 5px 0 var(--af-rouge); text-decoration: none; }
 .btn-primary:active { box-shadow: none; }
 
-/* ---------- Écran étroit : la feuille se déplie ------------------ */
-@media (max-width: 900px) {
+/* ---------- Écran étroit ou fenêtre portrait : la feuille se déplie --- */
+/* Les trois volets s'empilent alors TOUJOURS en colonne : la grille ne
+   passe jamais par un état « deux côte à côte + un isolé » (grid fixe,
+   aucun reflow intermédiaire). */
+@media (max-width: 900px), (orientation: portrait) {
   :host { --af-case: 76px; }
-  .page { width: calc(100vw - 20px); aspect-ratio: auto; margin: 12px auto; padding: 12px; }
+  .page { width: calc(100% - 20px); aspect-ratio: auto; margin: 12px auto; padding: 12px; }
   .sheet { grid-template-columns: 1fr; height: auto; }
   .panel { padding: 1.8em 1.4em; font-size: 14px; border-right: 0; border-bottom: 1px solid var(--af-filet); }
   .panel:last-child { border-bottom: 0; }
@@ -486,6 +504,21 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .sheet { width: 100%; height: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .panel { font-size: 1.06cqi; padding: 2.1em 1.9em 1.9em; break-inside: avoid; }
   a { text-decoration: none; }
+
+  /* Papier portrait forcé (less d'espace) : les trois volets s'empilent
+     en colonne, jamais deux côte à côte. Les variantes :host(.is-printing)
+     reprennent la main sur la géométrie de mesure paysage. */
+  @media (max-width: 900px) {
+    :host, :host(.is-printing) { width: 210mm; }
+    .page, :host(.is-printing) .page { width: 210mm; height: auto; margin: 0; padding: 6mm; border: 0; }
+    .sheet, :host(.is-printing) .sheet { width: 100%; height: auto; grid-template-columns: 1fr; }
+    .panel, :host(.is-printing) .panel { padding: 1.8em 1.4em; border-right: 0; border-bottom: 1px solid var(--af-filet); }
+    .panel:last-child, :host(.is-printing) .panel:last-child { border-right: 0; border-bottom: 0; }
+    .universe, :host(.is-printing) .universe { grid-column: auto; }
+    .universe-gallery { grid-template-columns: 1fr; grid-template-rows: none; }
+    .universe-item--featured { grid-row: auto; }
+    .universe-media { aspect-ratio: 16 / 9; }
+  }
 }
 
 /* ---------- Neutralisations du système --------------------------- */

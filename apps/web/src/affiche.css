@@ -367,3 +367,17 @@ body { background: var(--af-papier); color: var(--af-encre); }
   .af-app { min-height: auto; background: #fff; color: #000; }
   .af-app .hero, .af-app .panel, .af-app .metric { break-inside: avoid; background: #fff !important; color: #000; }
 }
+
+/* Coquille CV + feuille « Affiche » (paysage 297/210) : la règle .cv-shell-page
+   plafonne à 860px pour les gabarits portrait. Pour Affiche on lève le plafond
+   afin que la feuille se centre réellement (100% + margin auto), sans débordement
+   horizontal. La règle vit en global : le host <app-affiche-cv-page> est créé par
+   ngComponentOutlet et ne porte pas l'attribut de portée de la coquille, une
+   règle encapsulée ne pourrait donc pas le cibler via :has(). */
+/* !important : la règle encapsulée .cv-shell-page[_ngcontent] vaut (0,2,0) alors
+   que :has() ne compte que la spécificité de son argument (ici (0,0,1)) — une
+   surcharge simple perdrait le cascade battle. */
+.cv-shell-page:has(app-affiche-cv-page) { max-width: none !important; }
+
+/* Aperçu d'impression : 297mm paysage au lieu des 210mm portrait par défaut. */
+.cv-shell-page:has(app-affiche-cv-page) .cv-shell-page__document--preview { width: min(297mm, 100%); }
