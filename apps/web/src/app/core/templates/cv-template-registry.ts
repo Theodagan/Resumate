@@ -10,6 +10,8 @@ export interface CvTemplateOption {
   id: string;
   label: string;
   component: Type<unknown>;
+  /** Orientation of the rendered sheet; portrait (A4 vertical) when omitted. */
+  orientation?: 'portrait' | 'landscape';
   extraSchema?: CvTemplateExtraField[];
 }
 
@@ -91,6 +93,7 @@ export const CV_TEMPLATE_OPTIONS: CvTemplateOption[] = [
     id: 'affiche',
     label: 'Affiche',
     component: AfficheCvPage,
+    orientation: 'landscape',
     extraSchema: [
       {
         id: 'availability',

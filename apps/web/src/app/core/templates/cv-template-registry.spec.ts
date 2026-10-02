@@ -1,4 +1,4 @@
-import { CV_TEMPLATE_OPTIONS_BY_ID, isKnownCvTemplate } from './cv-template-registry';
+import { CV_TEMPLATE_OPTIONS, CV_TEMPLATE_OPTIONS_BY_ID, isKnownCvTemplate } from './cv-template-registry';
 
 describe('cv-template-registry', () => {
   it('recognizes known templates', () => {
@@ -21,6 +21,11 @@ describe('cv-template-registry', () => {
       ['showAllPages', 'boolean'],
     ]);
     expect(extraSchema.every((field) => Boolean(field.label) && Boolean(field.description))).toBe(true);
+  });
+
+  it('declares affiche as the only landscape template', () => {
+    expect(CV_TEMPLATE_OPTIONS.filter((template) => template.orientation === 'landscape').map((template) => template.id)).toEqual(['affiche']);
+    expect(CV_TEMPLATE_OPTIONS.filter((template) => !template.orientation)).toHaveLength(CV_TEMPLATE_OPTIONS.length - 1);
   });
 
   it('rejects unknown and falsy templates', () => {

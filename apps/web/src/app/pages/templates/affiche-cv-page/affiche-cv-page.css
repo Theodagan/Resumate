@@ -104,6 +104,12 @@ main.affiche-cv-page:not(.affiche-cv-page--state) {
   padding: 40px 24px;
 }
 
+/* Aperçu paysage : la feuille occupe la carte de bord à bord (aucune bande
+   résiduelle — le cadrage de la carte correspond exactement au ratio feuille). */
+:host-context(.template-preview-card__preview--landscape) .page {
+  width: 100%;
+}
+
 /* Carte d'aperçu (galerie, éditeur) : le host s'étire pour que le fond creux
    couvre toute la carte A4, sans bande blanche. */
 :host-context(.template-preview-card__preview) {

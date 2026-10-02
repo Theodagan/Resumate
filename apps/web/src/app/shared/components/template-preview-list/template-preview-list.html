@@ -17,7 +17,7 @@
               <span>{{ card.id }}</span>
             </div>
 
-            @if (allowA4Toggle()) {
+            @if (allowA4Toggle() && card.orientation !== 'landscape') {
               <button
                 class="template-preview-card__a4-button"
                 type="button"
@@ -35,6 +35,7 @@
         <div
           class="template-preview-card__preview"
           [class.template-preview-card__preview--a4]="isA4PreviewEnabled(card.id)"
+          [class.template-preview-card__preview--landscape]="card.orientation === 'landscape'"
           [class.cv-preview-enabled]="isA4PreviewEnabled(card.id)">
           <ng-container *ngComponentOutlet="card.component; inputs: { previewData: card.previewData }"></ng-container>
         </div>
