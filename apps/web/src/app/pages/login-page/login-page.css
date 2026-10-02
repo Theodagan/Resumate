@@ -18,6 +18,10 @@
   height: 100%;
   min-width: 0;
   background: transparent;
+  /* La colonne auth passe au-dessus du volet d'aperçus (qui s'étend sous le
+     formulaire) : sans z-index, le pane — empilé plus tard dans le DOM et
+     isolé par son transform rotate — peindrait par-dessus la carte. */
+  z-index: 1;
 }
 
 .login-card {
