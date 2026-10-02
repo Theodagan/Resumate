@@ -250,6 +250,23 @@ describe('AfficheCvPage extras', () => {
     expect(host.querySelectorAll('.missions li')).toHaveLength(1);
   });
 
+  it('decodes HTML entities when flattening rich text into plain paragraphs', () => {
+    const host = render({}, defaultAchievements(), {
+      jobs: [
+        {
+          ...salariedJob('job-1'),
+          responsibilities: '<p>D&eacute;veloppement full-stack, int&eacute;gration d&rsquo;APIs &agrave; la demande</p>',
+        },
+      ],
+    }).nativeElement;
+
+    const text = host.querySelector('.job-text')?.textContent ?? '';
+
+    expect(text).toContain('Développement full-stack');
+    expect(text).toContain('intégration d’APIs à la demande');
+    expect(text).not.toContain('&eacute;');
+  });
+
   // ---------- Univers : galerie vide ---------------------------------------
 
   it('drops the « Univers » intro when no project can feed the gallery', () => {

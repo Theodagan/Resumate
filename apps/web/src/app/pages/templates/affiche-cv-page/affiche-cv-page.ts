@@ -480,16 +480,12 @@ export class AfficheCvPage implements OnInit, OnDestroy {
       return '';
     }
 
-    return html
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\s+/g, ' ')
-      .trim();
+    // DOMParser is inert: tags are dropped and every entity reference
+    // (&eacute;, &rsquo;, numeric forms, ...) is decoded in one pass,
+    // without loading resources or executing anything.
+    const text = new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '';
+
+    return text.replace(/\s+/g, ' ').trim();
   }
 
   protected extra(key: string): CvProfileExtraValue | undefined {
