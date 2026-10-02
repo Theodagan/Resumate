@@ -322,9 +322,12 @@ main.affiche-cv-page:not(.affiche-cv-page--state) {
 .company { font: 500 .88em/1.4 var(--af-corps); color: var(--af-mine); }
 .job-text { margin-top: .3em; font-size: .88em; }
 
-/* Journal : axe 2 px, jalons Kandinsky 3n+1 / 3n+2 / 3n+3. */
+/* Journal : axe 2 px, jalons Kandinsky 3n+1 / 3n+2 / 3n+3.
+   L'axe part du CENTRE du premier jalon (jalon = 12 px, top .5em) : la forme
+   masque ainsi totalement la fin de la ligne — aucun pixel ne dépasse au-dessus
+   du premier jalon. */
 .timeline { position: relative; padding-left: 1.5em; }
-.timeline::before { content: ""; position: absolute; left: 0; top: .45em; bottom: .3em; width: 2px; background: var(--af-encre); }
+.timeline::before { content: ""; position: absolute; left: 0; top: calc(.5em + 6px); bottom: .3em; width: 2px; background: var(--af-encre); }
 .timeline-item { position: relative; padding: 0 0 1em; }
 .timeline-item:last-child { padding-bottom: 0; }
 .timeline-item::before { content: ""; position: absolute; left: calc(-1.5em - 5px); top: .5em; width: 12px; height: 12px; }
