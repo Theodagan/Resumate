@@ -17,23 +17,23 @@
 
           <div class="admin-bar__actions">
             <a [routerLink]="['/home']" class="btn btn--quiet speed-dial-action speed-dial-action--link" (click)="closeAdminBar()">
-              Accueil
+              <i class="bi bi-house-door" aria-hidden="true"></i> Accueil
             </a>
             <button class="btn btn--quiet speed-dial-action" type="button" (click)="togglePreviewMode(); closeAdminBar()">
-              {{ isPreviewMode() ? 'Quitter apercu' : 'Preview' }}
+              <i class="bi bi-eye" aria-hidden="true"></i> {{ isPreviewMode() ? 'Quitter apercu' : 'Preview' }}
             </button>
             <button class="btn btn--quiet speed-dial-action" type="button" (click)="printCv(); closeAdminBar()">
-              Imprimer
+              <i class="bi bi-printer" aria-hidden="true"></i> Imprimer
             </button>
             <a
               [routerLink]="['/home/profiles', profile.id, 'edit']"
               class="btn btn--quiet speed-dial-action speed-dial-action--link"
               (click)="closeAdminBar()"
             >
-              Gerer
+              <i class="bi bi-pencil-square" aria-hidden="true"></i> Gerer
             </a>
             <button class="btn btn--danger speed-dial-action" type="button" (click)="dismissAdminBar()">
-              Fermer
+              <i class="bi bi-x-lg" aria-hidden="true"></i> Fermer
             </button>
           </div>
         </div>

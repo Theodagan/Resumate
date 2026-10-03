@@ -120,6 +120,21 @@
   padding: 0;
 }
 
+/* Gabarit paysage (Affiche) : la carte épouse la feuille à largeur identique —
+   la zone vide du bas du format portrait disparaît. Déclaré après --a4 pour
+   l'emporter sur le cadrage portrait (un gabarit paysage ne se cadre pas en
+   portrait). Sur petit écran, retour au portrait A4 : le contenu s'empile déjà
+   sur une colonne (seuil ≤ 900px du gabarit). */
+.template-preview-card__preview--landscape {
+  aspect-ratio: 297 / 210;
+}
+
+@media (max-width: 720px) {
+  .template-preview-card__preview--landscape {
+    aspect-ratio: 210 / 297;
+  }
+}
+
 .template-preview-list--bare .template-preview-card__preview--a4 {
   width: 100%;
   margin: 0 auto;
