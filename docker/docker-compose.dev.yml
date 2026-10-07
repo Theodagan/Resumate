@@ -67,7 +67,7 @@ services:
         && node -e "require('fs').writeFileSync('src/assets/runtime-config.json',
         JSON.stringify({ bugReportUrl: process.env.BUG_REPORT_URL || '', mcpPublicBaseUrl: process.env.MCP_PUBLIC_BASE_URL || '' }))"
         && npm install
-        && npm start -- --port "${FRONTEND_INTERNAL_PORT:-4200}"
+        && npm start -- --host 0.0.0.0 --port "${FRONTEND_INTERNAL_PORT:-4200}"
     depends_on:
       pocketbase:
         condition: service_healthy
